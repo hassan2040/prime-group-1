@@ -13,24 +13,48 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { RoleModal } from '../components/RoleModal';
 import { Role } from '../types';
+import { db } from '../firebase';
+import { doc, deleteDoc } from 'firebase/firestore';
+import { handleFirestoreError, OperationType } from '../lib/firestoreUtils';
 
 export const RolesPage: React.FC = () => {
-  const { db, updateDB, addAuditLog } = useAppContext();
+  const { db: appData, addAuditLog, showToast } = useAppContext();
   const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingRole, setEditingRole] = useState<Role | undefined>(undefined);
+  const [isDeleting, setIsDeleting] = useState<string | null>(null);
 
-  if (!db || !user) return null;
+  if (!appData || !user) return null;
 
-  const roles = db.roles.filter(r => r.name.toLowerCase().includes(searchQuery.toLowerCase()));
+  const roles = appData.roles.filter(r => r.name.toLowerCase().includes(searchQuery.toLowerCase()));
 
   const handleDeleteRole = async (id: string) => {
-    if (!window.confirm('هل أنت متأكد من حذف هذا المسمى الوظيفي؟')) return;
+    const roleToDelete = appData.roles.find(r => r.id === id);
+    if (!roleToDelete) return;
+
+    // Check if any employee is using this role
+    const isUsed = appData.users.some(u => u.roleId === id);
+    if (isUsed) {
+      showToast('لا يمكن حذف هذا المسمى الوظيفي لأنه مرتبط بموظفين حاليين', 'error');
+      return;
+    }
+
+    if (!window.confirm(`هل أنت متأكد من حذف المسمى الوظيفي "${roleToDelete.name}"؟`)) return;
     
-    const newDB = { ...db, roles: db.roles.filter(r => r.id !== id) };
-    await updateDB(newDB);
-    addAuditLog(user.id, user.name, `حذف المسمى الوظيفي ذو المعرف: ${id}`);
+    setIsDeleting(id);
+    const path = `roles/${id}`;
+    try {
+      await deleteDoc(doc(db, 'roles', id));
+      addAuditLog(user.id, user.name, `حذف المسمى الوظيفي: ${roleToDelete.name}`);
+      showToast('تم حذف المسمى الوظيفي بنجاح');
+    } catch (error) {
+      console.error('Error deleting role:', error);
+      handleFirestoreError(error, OperationType.DELETE, path);
+      showToast('فشل حذف المسمى الوظيفي', 'error');
+    } finally {
+      setIsDeleting(null);
+    }
   };
 
   return (
@@ -75,7 +99,7 @@ export const RolesPage: React.FC = () => {
           </thead>
           <tbody className="divide-y divide-white/5">
             {roles.map(role => {
-              const count = db.users.filter(u => u.roleId === role.id).length;
+              const count = appData.users.filter(u => u.roleId === role.id).length;
               return (
                 <tr key={role.id} className="hover:bg-white/5 transition-colors group">
                   <td className="px-6 py-5">
@@ -102,9 +126,10 @@ export const RolesPage: React.FC = () => {
                       </button>
                       <button 
                         onClick={() => handleDeleteRole(role.id)}
-                        className="p-2 rounded-lg hover:bg-red-500/10 text-zinc-500 hover:text-red-400 transition-all"
+                        disabled={isDeleting === role.id}
+                        className="p-2 rounded-lg hover:bg-red-500/10 text-zinc-500 hover:text-red-400 transition-all disabled:opacity-50"
                       >
-                        <Trash2 className="w-4 h-4" />
+                        <Trash2 className={`w-4 h-4 ${isDeleting === role.id ? 'animate-spin' : ''}`} />
                       </button>
                     </div>
                   </td>
@@ -118,7 +143,7 @@ export const RolesPage: React.FC = () => {
       {/* Mobile Cards */}
       <div className="md:hidden space-y-4">
         {roles.map(role => {
-          const count = db.users.filter(u => u.roleId === role.id).length;
+          const count = appData.users.filter(u => u.roleId === role.id).length;
           return (
             <div key={role.id} className="bg-zinc-900/50 border border-white/5 p-5 rounded-2xl space-y-4">
               <div className="flex items-center justify-between">
@@ -143,9 +168,10 @@ export const RolesPage: React.FC = () => {
                 </button>
                 <button 
                   onClick={() => handleDeleteRole(role.id)}
-                  className="flex items-center gap-2 px-4 py-2 rounded-xl bg-red-500/10 text-red-400 text-sm font-bold"
+                  disabled={isDeleting === role.id}
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl bg-red-500/10 text-red-400 text-sm font-bold disabled:opacity-50"
                 >
-                  <Trash2 className="w-4 h-4" />
+                  <Trash2 className={`w-4 h-4 ${isDeleting === role.id ? 'animate-spin' : ''}`} />
                   حذف
                 </button>
               </div>

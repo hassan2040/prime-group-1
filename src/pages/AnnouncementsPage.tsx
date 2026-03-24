@@ -19,61 +19,82 @@ import { motion, AnimatePresence } from 'motion/react';
 import { CreateAnnouncementModal } from '../components/CreateAnnouncementModal';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { Announcement } from '../types';
+import { db as firestore } from '../firebase';
+import { doc, updateDoc, arrayUnion, deleteDoc } from 'firebase/firestore';
 
 export const AnnouncementsPage: React.FC = () => {
-  const { db, updateDB, addAuditLog, showToast } = useAppContext();
+  const { db: appData, addAuditLog, showToast } = useAppContext();
   const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
   const [deletingAnnouncement, setDeletingAnnouncement] = useState<Announcement | null>(null);
 
-  if (!db || !user) return null;
+  if (!appData || !user) return null;
 
-  const announcements = db.announcements.filter(a => 
+  const announcements = appData.announcements.filter(a => 
     (showArchived ? a.isArchived : !a.isArchived) && 
     (a.title.toLowerCase().includes(searchQuery.toLowerCase()) || a.content.toLowerCase().includes(searchQuery.toLowerCase()))
   ).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
   const handleAcknowledge = async (id: string) => {
-    const newDB = { ...db };
-    const announcement = newDB.announcements.find(a => a.id === id);
-    if (announcement && !announcement.acknowledgedBy.includes(user.id)) {
-      announcement.acknowledgedBy.push(user.id);
-      if (!announcement.readBy.includes(user.id)) {
-        announcement.readBy.push(user.id);
+    try {
+      const announcement = appData.announcements.find(a => a.id === id);
+      if (announcement && !announcement.acknowledgedBy.includes(user.id)) {
+        const annRef = doc(firestore, 'announcements', id);
+        const updates: any = {
+          acknowledgedBy: arrayUnion(user.id)
+        };
+        if (!announcement.readBy.includes(user.id)) {
+          updates.readBy = arrayUnion(user.id);
+        }
+        await updateDoc(annRef, updates);
+        addAuditLog(user.id, user.name, `أكد العلم بالإعلان: ${announcement.title}`);
       }
-      await updateDB(newDB);
-      addAuditLog(user.id, user.name, `أكد العلم بالإعلان: ${announcement.title}`);
+    } catch (error) {
+      console.error('Error acknowledging announcement:', error);
     }
   };
 
   const handleRead = async (id: string) => {
-    const newDB = { ...db };
-    const announcement = newDB.announcements.find(a => a.id === id);
-    if (announcement && !announcement.readBy.includes(user.id)) {
-      announcement.readBy.push(user.id);
-      await updateDB(newDB);
+    try {
+      const announcement = appData.announcements.find(a => a.id === id);
+      if (announcement && !announcement.readBy.includes(user.id)) {
+        const annRef = doc(firestore, 'announcements', id);
+        await updateDoc(annRef, {
+          readBy: arrayUnion(user.id)
+        });
+      }
+    } catch (error) {
+      console.error('Error reading announcement:', error);
     }
   };
 
   const handleArchive = async (id: string) => {
-    const newDB = { ...db };
-    const announcement = newDB.announcements.find(a => a.id === id);
-    if (announcement) {
-      announcement.isArchived = !announcement.isArchived;
-      await updateDB(newDB);
-      addAuditLog(user.id, user.name, `${announcement.isArchived ? 'أرشف' : 'استعاد'} الإعلان: ${announcement.title}`);
+    try {
+      const announcement = appData.announcements.find(a => a.id === id);
+      if (announcement) {
+        const annRef = doc(firestore, 'announcements', id);
+        await updateDoc(annRef, {
+          isArchived: !announcement.isArchived
+        });
+        addAuditLog(user.id, user.name, `${!announcement.isArchived ? 'أرشف' : 'استعاد'} الإعلان: ${announcement.title}`);
+      }
+    } catch (error) {
+      console.error('Error archiving announcement:', error);
     }
   };
 
   const handleDelete = async () => {
     if (!deletingAnnouncement) return;
-    const newDB = { ...db, announcements: db.announcements.filter(a => a.id !== deletingAnnouncement.id) };
-    await updateDB(newDB);
-    addAuditLog(user.id, user.name, `حذف الإعلان: ${deletingAnnouncement.title}`);
-    showToast(`تم حذف الإعلان بنجاح`);
-    setDeletingAnnouncement(null);
+    try {
+      await deleteDoc(doc(firestore, 'announcements', deletingAnnouncement.id));
+      addAuditLog(user.id, user.name, `حذف الإعلان: ${deletingAnnouncement.title}`);
+      showToast(`تم حذف الإعلان بنجاح`);
+      setDeletingAnnouncement(null);
+    } catch (error) {
+      console.error('Error deleting announcement:', error);
+    }
   };
 
   return (
@@ -171,9 +192,9 @@ export const AnnouncementsPage: React.FC = () => {
                   
                   {announcement.attachments.length > 0 && (
                     <div className="flex flex-wrap gap-3 pt-4">
-                      {announcement.attachments.map((file, idx) => (
+                      {announcement.attachments.map((file) => (
                         <a 
-                          key={idx} 
+                          key={file.url} 
                           href={file.url} 
                           target="_blank" 
                           rel="noopener noreferrer"
@@ -194,7 +215,7 @@ export const AnnouncementsPage: React.FC = () => {
                     <div className="flex items-center gap-2">
                       <div className="flex -space-x-2 rtl:space-x-reverse">
                         {announcement.readBy.slice(0, 3).map(uid => {
-                          const reader = db.users.find(u => u.id === uid);
+                          const reader = appData.users.find(u => u.id === uid);
                           return (
                             <div key={uid} className="w-8 h-8 rounded-full border-2 border-zinc-900 bg-zinc-800 flex items-center justify-center overflow-hidden" title={reader?.name}>
                               {reader?.avatar ? <img src={reader.avatar} alt="" /> : <UserIcon className="w-4 h-4 text-zinc-500" />}
@@ -203,7 +224,7 @@ export const AnnouncementsPage: React.FC = () => {
                         })}
                       </div>
                       <span className="text-xs font-bold text-zinc-400">
-                        {announcement.readBy.length} من {db.users.length}
+                        {announcement.readBy.length} من {appData.users.length}
                       </span>
                     </div>
                   </div>

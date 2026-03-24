@@ -19,17 +19,17 @@ interface SettingsPageProps {
 }
 
 export const SettingsPage: React.FC<SettingsPageProps> = ({ setActivePage }) => {
-  const { db, updateDB, addAuditLog, uploadFile, showToast } = useAppContext();
+  const { db: appData, updateDB, addAuditLog, uploadFile, showToast } = useAppContext();
   const { user } = useAuth();
-  const [companyName, setCompanyName] = useState(db?.company.name || '');
-  const [loginTitle, setLoginTitle] = useState(db?.company.loginTitle || '');
-  const [loginSubtitle, setLoginSubtitle] = useState(db?.company.loginSubtitle || '');
-  const [loginBg, setLoginBg] = useState(db?.company.loginBg || '');
-  const [primaryColor, setPrimaryColor] = useState(db?.company.primaryColor || '#2563eb');
+  const [companyName, setCompanyName] = useState(appData?.company.name || '');
+  const [loginTitle, setLoginTitle] = useState(appData?.company.loginTitle || '');
+  const [loginSubtitle, setLoginSubtitle] = useState(appData?.company.loginSubtitle || '');
+  const [loginBg, setLoginBg] = useState(appData?.company.loginBg || '');
+  const [primaryColor, setPrimaryColor] = useState(appData?.company.primaryColor || '#2563eb');
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  if (!db || !user) return null;
+  if (!appData || !user) return null;
 
   const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -37,7 +37,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ setActivePage }) => 
       try {
         const file = e.target.files[0];
         const uploaded = await uploadFile(file);
-        const newDB = { ...db, company: { ...db.company, logo: uploaded.url } };
+        const newDB = { ...appData, company: { ...appData.company, logo: uploaded.url } };
         await updateDB(newDB);
         addAuditLog(user.id, user.name, 'تغيير شعار الشركة');
         showToast('تم تحديث الشعار بنجاح');
@@ -51,9 +51,9 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ setActivePage }) => 
 
   const handleSaveSettings = async () => {
     const newDB = { 
-      ...db, 
+      ...appData, 
       company: { 
-        ...db.company, 
+        ...appData.company, 
         name: companyName,
         loginTitle,
         loginSubtitle,
@@ -67,7 +67,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ setActivePage }) => 
   };
 
   const handleBackup = () => {
-    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(db));
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(appData));
     const downloadAnchorNode = document.createElement('a');
     downloadAnchorNode.setAttribute("href", dataStr);
     downloadAnchorNode.setAttribute("download", `ems_backup_${new Date().toISOString().split('T')[0]}.json`);
@@ -137,8 +137,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ setActivePage }) => 
                 <label className="text-sm text-zinc-400 mr-1">شعار الشركة</label>
                 <div className="flex items-center gap-4">
                   <div className="w-14 h-14 rounded-2xl bg-zinc-800 border border-dashed border-white/10 flex items-center justify-center overflow-hidden">
-                    {db.company.logo ? (
-                      <img src={db.company.logo} alt="Logo" className="w-full h-full object-cover" />
+                    {appData.company.logo ? (
+                      <img src={appData.company.logo} alt="Logo" className="w-full h-full object-cover" />
                     ) : (
                       <ImageIcon className="w-6 h-6 text-zinc-600" />
                     )}
@@ -279,10 +279,10 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({ setActivePage }) => 
           </h2>
           
           <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2">
-            {db.auditLog.length === 0 ? (
+            {appData.auditLog.length === 0 ? (
               <p className="text-center text-zinc-600 py-10">لا توجد نشاطات مسجلة</p>
             ) : (
-              db.auditLog.map(log => (
+              appData.auditLog.map(log => (
                 <div key={log.id} className="p-4 bg-white/5 rounded-2xl border border-white/5">
                   <p className="text-sm font-medium mb-1">{log.action}</p>
                   <div className="flex items-center justify-between text-[10px] text-zinc-500">

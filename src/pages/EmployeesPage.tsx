@@ -25,10 +25,13 @@ import { AddEmployeeModal } from '../components/AddEmployeeModal';
 import { EditEmployeeModal } from '../components/EditEmployeeModal';
 import { ResetPasswordModal } from '../components/ResetPasswordModal';
 import { ConfirmModal } from '../components/ConfirmModal';
-import { User, Department } from '../types';
+import { User, Department, Role } from '../types';
+import { db } from '../firebase';
+import { doc, deleteDoc, setDoc } from 'firebase/firestore';
+import { handleFirestoreError, OperationType } from '../lib/firestoreUtils';
 
 export const EmployeesPage: React.FC = () => {
-  const { db, updateDB, addAuditLog, showToast } = useAppContext();
+  const { db: appData, addAuditLog, showToast } = useAppContext();
   const { user: currentUser } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
@@ -38,14 +41,15 @@ export const EmployeesPage: React.FC = () => {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isDeptModalOpen, setIsDeptModalOpen] = useState(false);
   const [newDeptName, setNewDeptName] = useState('');
+  const [selectedParentDeptId, setSelectedParentDeptId] = useState<string>('');
   
   const [editingEmployee, setEditingEmployee] = useState<User | null>(null);
   const [resettingPassword, setResettingPassword] = useState<User | null>(null);
   const [deletingEmployee, setDeletingEmployee] = useState<User | null>(null);
 
-  if (!db || !currentUser) return null;
+  if (!appData || !currentUser) return null;
 
-  const employees = db.users.filter(u => {
+  const employees = appData.users.filter(u => {
     const matchesSearch = u.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
                           u.username.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = statusFilter === 'all' || u.status === statusFilter;
@@ -57,28 +61,98 @@ export const EmployeesPage: React.FC = () => {
 
   const handleDeleteUser = async () => {
     if (!deletingEmployee) return;
-    const newDB = { ...db, users: db.users.filter(u => u.id !== deletingEmployee.id) };
-    await updateDB(newDB);
-    addAuditLog(currentUser.id, currentUser.name, `حذف الموظف: ${deletingEmployee.name}`);
-    showToast(`تم حذف الموظف ${deletingEmployee.name} بنجاح`);
-    setDeletingEmployee(null);
+    try {
+      await deleteDoc(doc(db, 'users', deletingEmployee.id));
+      addAuditLog(currentUser.id, currentUser.name, `حذف الموظف: ${deletingEmployee.name}`);
+      showToast(`تم حذف الموظف ${deletingEmployee.name} بنجاح`);
+      setDeletingEmployee(null);
+    } catch (error) {
+      console.error('Error deleting user:', error);
+      showToast('فشل في حذف الموظف', 'error');
+    }
   };
 
   const handleAddDept = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newDeptName.trim()) return;
     
-    const newDept: Department = {
-      id: Math.random().toString(36).substr(2, 9),
-      name: newDeptName.trim()
-    };
-    
-    const newDB = { ...db, departments: [...db.departments, newDept] };
-    await updateDB(newDB);
-    addAuditLog(currentUser.id, currentUser.name, `أضاف قسماً جديداً: ${newDeptName}`);
-    showToast(`تم إضافة القسم ${newDeptName} بنجاح`);
-    setNewDeptName('');
-    setIsDeptModalOpen(false);
+    try {
+      const deptId = Math.random().toString(36).substr(2, 9);
+      const newDept: any = {
+        id: deptId,
+        name: newDeptName.trim(),
+      };
+      
+      if (selectedParentDeptId) {
+        newDept.parentId = selectedParentDeptId;
+      }
+      
+      await setDoc(doc(db, 'departments', deptId), newDept);
+      
+      addAuditLog(currentUser.id, currentUser.name, `أضاف قسماً جديداً: ${newDeptName}`);
+      showToast(`تم إضافة القسم ${newDeptName} بنجاح`);
+      setNewDeptName('');
+      setSelectedParentDeptId('');
+    } catch (error) {
+      console.error('Error adding department:', error);
+      showToast('فشل في إضافة القسم', 'error');
+    }
+  };
+
+  const handleDeleteDept = async (dept: Department) => {
+    // Check if any employee is in this department
+    const isUsed = appData.users.some(u => u.departmentId === dept.id);
+    if (isUsed) {
+      showToast('لا يمكن حذف هذا القسم لأنه يحتوي على موظفين', 'error');
+      return;
+    }
+
+    // Check if it has sub-departments
+    const hasSubDepts = appData.departments.some(d => d.parentId === dept.id);
+    if (hasSubDepts) {
+      showToast('لا يمكن حذف هذا القسم لأنه يحتوي على أقسام فرعية', 'error');
+      return;
+    }
+
+    if (!window.confirm(`هل أنت متأكد من حذف القسم "${dept.name}"؟`)) return;
+
+    try {
+      await deleteDoc(doc(db, 'departments', dept.id));
+      addAuditLog(currentUser.id, currentUser.name, `حذف القسم: ${dept.name}`);
+      showToast('تم حذف القسم بنجاح');
+    } catch (error) {
+      console.error('Error deleting department:', error);
+      showToast('فشل في حذف القسم', 'error');
+    }
+  };
+
+  const renderDeptHierarchy = (parentId: string | undefined = undefined, level: number = 0, visited = new Set<string>()) => {
+    const depts = appData.departments.filter(d => (d.parentId || undefined) === (parentId || undefined));
+    return depts.map(dept => {
+      if (visited.has(dept.id)) return null;
+      visited.add(dept.id);
+      
+      return (
+        <React.Fragment key={dept.id}>
+          <div 
+            className="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/5 hover:border-white/10 transition-all"
+            style={{ marginRight: `${level * 24}px` }}
+          >
+            <div className="flex items-center gap-2">
+              {level > 0 && <div className="w-4 h-px bg-zinc-700"></div>}
+              <span className="font-bold">{dept.name}</span>
+            </div>
+            <button 
+              onClick={() => handleDeleteDept(dept)}
+              className="text-red-500 hover:bg-red-500/10 p-2 rounded-lg transition-all"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          </div>
+          {renderDeptHierarchy(dept.id, level + 1, visited)}
+        </React.Fragment>
+      );
+    });
   };
 
   return (
@@ -135,7 +209,7 @@ export const EmployeesPage: React.FC = () => {
             className="bg-zinc-900/50 border border-white/5 text-zinc-400 px-4 py-3.5 rounded-2xl outline-none focus:ring-2 focus:ring-primary transition-all text-sm"
           >
             <option value="all">الدور: الكل</option>
-            {db.roles.map(role => (
+            {appData.roles.map(role => (
               <option key={role.id} value={role.id}>{role.name}</option>
             ))}
           </select>
@@ -145,9 +219,23 @@ export const EmployeesPage: React.FC = () => {
             className="bg-zinc-900/50 border border-white/5 text-zinc-400 px-4 py-3.5 rounded-2xl outline-none focus:ring-2 focus:ring-primary transition-all text-sm"
           >
             <option value="all">القسم: الكل</option>
-            {db.departments.map(dept => (
-              <option key={dept.id} value={dept.id}>{dept.name}</option>
-            ))}
+            {(() => {
+              const renderOptions = (parentId: string | undefined = undefined, level: number = 0, visited = new Set<string>()): React.ReactNode[] => {
+                const depts = appData.departments.filter(d => (d.parentId || undefined) === (parentId || undefined));
+                return depts.flatMap(dept => {
+                  if (visited.has(dept.id)) return [];
+                  visited.add(dept.id);
+                  
+                  return [
+                    <option key={dept.id} value={dept.id}>
+                      {'\u00A0'.repeat(level * 4)}{level > 0 ? '↳ ' : ''}{dept.name}
+                    </option>,
+                    ...renderOptions(dept.id, level + 1, visited)
+                  ];
+                });
+              };
+              return renderOptions();
+            })()}
           </select>
         </div>
       </div>
@@ -167,9 +255,9 @@ export const EmployeesPage: React.FC = () => {
                 <div>
                   <h3 className="font-bold text-lg">{employee.name}</h3>
                   <div className="flex flex-wrap gap-2">
-                    <p className="text-zinc-500 text-xs">{db.roles.find(r => r.id === employee.roleId)?.name}</p>
+                    <p className="text-zinc-500 text-xs">{appData.roles.find(r => r.id === employee.roleId)?.name}</p>
                     {employee.departmentId && (
-                      <p className="text-primary text-xs font-bold">• {db.departments.find(d => d.id === employee.departmentId)?.name}</p>
+                      <p className="text-primary text-xs font-bold">• {appData.departments.find(d => d.id === employee.departmentId)?.name}</p>
                     )}
                   </div>
                 </div>
@@ -244,35 +332,38 @@ export const EmployeesPage: React.FC = () => {
                 </button>
               </div>
               <div className="p-8 space-y-6">
-                <form onSubmit={handleAddDept} className="flex gap-2">
-                  <input 
-                    type="text"
-                    value={newDeptName}
-                    onChange={(e) => setNewDeptName(e.target.value)}
-                    placeholder="اسم القسم الجديد..."
-                    className="flex-1 bg-zinc-800 border border-white/5 text-white px-4 py-3 rounded-xl outline-none focus:ring-2 focus:ring-primary"
-                  />
-                  <button type="submit" className="bg-primary text-white p-3 rounded-xl hover:bg-primary-hover transition-all">
-                    <Plus className="w-6 h-6" />
-                  </button>
+                <form onSubmit={handleAddDept} className="space-y-4">
+                  <div className="flex gap-2">
+                    <input 
+                      type="text"
+                      value={newDeptName}
+                      onChange={(e) => setNewDeptName(e.target.value)}
+                      placeholder="اسم القسم الجديد..."
+                      className="flex-1 bg-zinc-800 border border-white/5 text-white px-4 py-3 rounded-xl outline-none focus:ring-2 focus:ring-primary"
+                    />
+                    <button type="submit" className="bg-primary text-white p-3 rounded-xl hover:bg-primary-hover transition-all">
+                      <Plus className="w-6 h-6" />
+                    </button>
+                  </div>
+                  
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-zinc-500 mr-1">يتبع لقسم (اختياري)</label>
+                    <select
+                      value={selectedParentDeptId}
+                      onChange={(e) => setSelectedParentDeptId(e.target.value)}
+                      className="w-full bg-zinc-800 border border-white/5 text-white px-4 py-3 rounded-xl outline-none focus:ring-2 focus:ring-primary text-sm"
+                    >
+                      <option value="">قسم رئيسي</option>
+                      {appData.departments.map(dept => (
+                        <option key={dept.id} value={dept.id}>{dept.name}</option>
+                      ))}
+                    </select>
+                  </div>
                 </form>
                 
-                <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2">
-                  {db.departments.map(dept => (
-                    <div key={dept.id} className="flex items-center justify-between p-4 bg-white/5 rounded-2xl">
-                      <span className="font-bold">{dept.name}</span>
-                      <button 
-                        onClick={async () => {
-                          const newDB = { ...db, departments: db.departments.filter(d => d.id !== dept.id) };
-                          await updateDB(newDB);
-                        }}
-                        className="text-red-500 hover:bg-red-500/10 p-2 rounded-lg transition-all"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  ))}
-                  {db.departments.length === 0 && (
+                <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+                  {renderDeptHierarchy()}
+                  {appData.departments.length === 0 && (
                     <p className="text-center text-zinc-500 py-4">لا توجد أقسام مضافة</p>
                   )}
                 </div>

@@ -12,17 +12,19 @@ import {
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Permission, User } from '../types';
+import { db as firestore } from '../firebase';
+import { doc, updateDoc } from 'firebase/firestore';
 
 export const PermissionsPage: React.FC = () => {
-  const { db, updateDB, addAuditLog } = useAppContext();
+  const { db: appData, addAuditLog } = useAppContext();
   const { user: currentUser } = useAuth();
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
 
-  if (!db || !currentUser) return null;
+  if (!appData || !currentUser) return null;
 
-  const users = db.users.filter(u => u.name.toLowerCase().includes(searchQuery.toLowerCase()));
-  const selectedUser = db.users.find(u => u.id === selectedUserId);
+  const users = appData.users.filter(u => u.name.toLowerCase().includes(searchQuery.toLowerCase()));
+  const selectedUser = appData.users.find(u => u.id === selectedUserId);
 
   const permissions: { id: Permission; label: string; desc: string }[] = [
     { id: 'full_control', label: 'التحكم الكامل', desc: 'جميع الصلاحيات معاً' },
@@ -43,26 +45,37 @@ export const PermissionsPage: React.FC = () => {
   const handleTogglePermission = async (perm: Permission) => {
     if (!selectedUser) return;
     
-    const newDB = { ...db };
-    const userIdx = newDB.users.findIndex(u => u.id === selectedUser.id);
-    const userPerms = [...newDB.users[userIdx].permissions];
-    
-    if (userPerms.includes(perm)) {
-      newDB.users[userIdx].permissions = userPerms.filter(p => p !== perm);
-    } else {
-      newDB.users[userIdx].permissions = [...userPerms, perm];
+    try {
+      const userPerms = [...selectedUser.permissions];
+      let newPerms;
+      
+      if (userPerms.includes(perm)) {
+        newPerms = userPerms.filter(p => p !== perm);
+      } else {
+        newPerms = [...userPerms, perm];
+      }
+      
+      await updateDoc(doc(firestore, 'users', selectedUser.id), {
+        permissions: newPerms
+      });
+      
+      addAuditLog(currentUser.id, currentUser.name, `تعديل صلاحيات الموظف: ${selectedUser.name}`);
+    } catch (error) {
+      console.error('Error updating permissions:', error);
     }
-    
-    await updateDB(newDB);
-    addAuditLog(currentUser.id, currentUser.name, `تعديل صلاحيات الموظف: ${selectedUser.name}`);
   };
 
   const handleSetAll = async (enable: boolean) => {
     if (!selectedUser) return;
-    const newDB = { ...db };
-    const userIdx = newDB.users.findIndex(u => u.id === selectedUser.id);
-    newDB.users[userIdx].permissions = enable ? permissions.map(p => p.id) : [];
-    await updateDB(newDB);
+    try {
+      const newPerms = enable ? permissions.map(p => p.id) : [];
+      await updateDoc(doc(firestore, 'users', selectedUser.id), {
+        permissions: newPerms
+      });
+      addAuditLog(currentUser.id, currentUser.name, `${enable ? 'تفعيل' : 'سحب'} جميع صلاحيات الموظف: ${selectedUser.name}`);
+    } catch (error) {
+      console.error('Error setting all permissions:', error);
+    }
   };
 
   return (
@@ -99,7 +112,7 @@ export const PermissionsPage: React.FC = () => {
                 </div>
                 <div className="min-w-0">
                   <p className="font-bold text-sm truncate">{u.name}</p>
-                  <p className="text-[10px] text-zinc-500 truncate">{db.roles.find(r => r.id === u.roleId)?.name}</p>
+                  <p className="text-[10px] text-zinc-500 truncate">{appData.roles.find(r => r.id === u.roleId)?.name}</p>
                 </div>
               </button>
             ))}

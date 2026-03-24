@@ -4,13 +4,16 @@ import { useAuth } from '../context/AuthContext';
 import { X, Plus, User as UserIcon, Calendar, Flag, FileText, Search, Clock, ListTodo } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Task } from '../types';
+import { db as firestore } from '../firebase';
+import { doc, setDoc, collection } from 'firebase/firestore';
+import { handleFirestoreError, OperationType } from '../lib/firestoreUtils';
 
 interface CreateTaskModalProps {
   onClose: () => void;
 }
 
 export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ onClose }) => {
-  const { db, updateDB, addAuditLog, addNotification, uploadFile } = useAppContext();
+  const { db: appData, addAuditLog, addNotification, uploadFile } = useAppContext();
   const { user } = useAuth();
   
   const [title, setTitle] = useState('');
@@ -26,7 +29,7 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ onClose }) => 
   const [attachments, setAttachments] = useState<{ url: string; name: string }[]>([]);
   const [isUploading, setIsUploading] = useState(false);
 
-  if (!db || !user) return null;
+  if (!appData || !user) return null;
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -46,83 +49,93 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ onClose }) => 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Create subtasks first
-    const createdSubtasks: Task[] = subtaskTitles.map(stTitle => ({
-      id: Math.random().toString(36).substr(2, 9),
-      title: stTitle,
-      description: `مهمة فرعية لـ: ${title}`,
-      assignedTo,
-      type: 'individual',
-      deadline,
-      status: 'new',
-      priority,
-      attachments: [],
-      mentions: [],
-      createdBy: user.id,
-      createdAt: new Date().toISOString(),
-      reports: []
-    }));
+    try {
+      // Create subtasks first
+      const subtaskIds: string[] = [];
+      for (const stTitle of subtaskTitles) {
+        const stId = Math.random().toString(36).substr(2, 9);
+        const subtask: Task = {
+          id: stId,
+          title: stTitle,
+          description: `مهمة فرعية لـ: ${title}`,
+          assignedTo,
+          type: 'individual',
+          deadline,
+          status: 'new',
+          priority,
+          attachments: [],
+          mentions: [],
+          createdBy: user.id,
+          createdAt: new Date().toISOString(),
+          reports: []
+        };
+        await setDoc(doc(firestore, 'tasks', stId), subtask);
+        subtaskIds.push(stId);
+      }
 
-    const newTask: Task = {
-      id: Math.random().toString(36).substr(2, 9),
-      title,
-      description,
-      assignedTo,
-      type,
-      deadline,
-      status: 'new',
-      priority,
-      estimatedHours,
-      actualHours: 0,
-      subtasks: createdSubtasks.map(st => st.id),
-      attachments,
-      mentions: [],
-      createdBy: user.id,
-      createdAt: new Date().toISOString(),
-      reports: []
-    };
+      const taskId = Math.random().toString(36).substr(2, 9);
+      const newTask: Task = {
+        id: taskId,
+        title,
+        description,
+        assignedTo,
+        type,
+        deadline,
+        status: 'new',
+        priority,
+        estimatedHours,
+        actualHours: 0,
+        subtasks: subtaskIds,
+        attachments,
+        mentions: [],
+        createdBy: user.id,
+        createdAt: new Date().toISOString(),
+        reports: []
+      };
 
-    // Detect mentions
-    const mentionRegex = /@(\w+)/g;
-    const matches = description.match(mentionRegex);
-    if (matches) {
-      const mentionedUsernames = matches.map(m => m.substring(1));
-      const mentionedUsers = db.users.filter(u => mentionedUsernames.includes(u.username));
-      newTask.mentions = mentionedUsers.map(u => u.id);
+      // Detect mentions
+      const mentionRegex = /@(\w+)/g;
+      const matches = description.match(mentionRegex);
+      if (matches) {
+        const mentionedUsernames = matches.map(m => m.substring(1));
+        const mentionedUsers = appData.users.filter(u => mentionedUsernames.includes(u.username));
+        newTask.mentions = mentionedUsers.map(u => u.id);
+        
+        // Notify mentioned users
+        mentionedUsers.forEach(u => {
+          if (!assignedTo.includes(u.id)) { // Don't notify twice if they are already assigned
+            addNotification({
+              userId: u.id,
+              title: 'إشارة إليك',
+              message: `تمت الإشارة إليك في المهمة: ${title}`,
+              type: 'task_deadline',
+              link: '/tasks'
+            });
+          }
+        });
+      }
+
+      await setDoc(doc(firestore, 'tasks', taskId), newTask);
+      addAuditLog(user.id, user.name, `أنشأ مهمة جديدة: ${title}`);
       
-      // Notify mentioned users
-      mentionedUsers.forEach(u => {
-        if (!assignedTo.includes(u.id)) { // Don't notify twice if they are already assigned
-          addNotification({
-            userId: u.id,
-            title: 'إشارة إليك',
-            message: `تمت الإشارة إليك في المهمة: ${title}`,
-            type: 'task_deadline',
-            link: '/tasks'
-          });
-        }
+      // Notify assignees
+      assignedTo.forEach(uid => {
+        addNotification({
+          userId: uid,
+          title: 'مهمة جديدة',
+          message: `تم تكليفك بمهمة جديدة: ${title}`,
+          type: 'task_deadline',
+          link: '/tasks'
+        });
       });
+
+      onClose();
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, 'tasks');
     }
-
-    const newDB = { ...db, tasks: [...createdSubtasks, newTask, ...db.tasks] };
-    await updateDB(newDB);
-    addAuditLog(user.id, user.name, `أنشأ مهمة جديدة: ${title}`);
-    
-    // Notify assignees
-    assignedTo.forEach(uid => {
-      addNotification({
-        userId: uid,
-        title: 'مهمة جديدة',
-        message: `تم تكليفك بمهمة جديدة: ${title}`,
-        type: 'task_deadline',
-        link: '/tasks'
-      });
-    });
-
-    onClose();
   };
 
-  const filteredEmployees = db.users.filter(u => 
+  const filteredEmployees = appData.users.filter(u => 
     u.name.toLowerCase().includes(employeeSearch.toLowerCase()) || 
     u.username.toLowerCase().includes(employeeSearch.toLowerCase())
   );
@@ -246,15 +259,15 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ onClose }) => 
                     </button>
                   </div>
                   <div className="space-y-2 mt-2">
-                    {subtaskTitles.map((st, idx) => (
-                      <div key={idx} className="flex items-center justify-between p-3 bg-white/5 rounded-xl border border-white/5">
+                    {subtaskTitles.map((st) => (
+                      <div key={st} className="flex items-center justify-between p-3 bg-white/5 rounded-xl border border-white/5">
                         <div className="flex items-center gap-2">
                           <ListTodo className="w-4 h-4 text-zinc-500" />
                           <span className="text-sm">{st}</span>
                         </div>
                         <button 
                           type="button"
-                          onClick={() => setSubtaskTitles(subtaskTitles.filter((_, i) => i !== idx))}
+                          onClick={() => setSubtaskTitles(subtaskTitles.filter((title) => title !== st))}
                           className="text-red-500 hover:bg-red-500/10 p-1 rounded-lg transition-all"
                         >
                           <X className="w-4 h-4" />
@@ -287,13 +300,13 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ onClose }) => 
               <div className="space-y-2">
                 <label className="text-sm text-zinc-400 mr-1">المرفقات</label>
                 <div className="flex flex-wrap gap-2 mb-2">
-                  {attachments.map((file, idx) => (
-                    <div key={idx} className="bg-zinc-800 px-3 py-1.5 rounded-xl text-[10px] flex items-center gap-2 border border-white/5">
+                  {attachments.map((file) => (
+                    <div key={file.url} className="bg-zinc-800 px-3 py-1.5 rounded-xl text-[10px] flex items-center gap-2 border border-white/5">
                       <FileText className="w-3 h-3 text-zinc-500" />
                       <span>{file.name}</span>
                       <button 
                         type="button" 
-                        onClick={() => setAttachments(attachments.filter((_, i) => i !== idx))}
+                        onClick={() => setAttachments(attachments.filter((a) => a.url !== file.url))}
                         className="hover:text-red-400"
                       >
                         <X className="w-3 h-3" />
@@ -341,7 +354,7 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ onClose }) => 
                     </div>
                     <div className="min-w-0">
                       <p className="font-bold text-xs truncate">{u.name}</p>
-                      <p className="text-[10px] text-zinc-500 truncate">{db.roles.find(r => r.id === u.roleId)?.name}</p>
+                      <p className="text-[10px] text-zinc-500 truncate">{appData.roles.find(r => r.id === u.roleId)?.name}</p>
                     </div>
                   </button>
                 ))}

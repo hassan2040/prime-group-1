@@ -17,16 +17,16 @@ import {
 import { motion } from 'motion/react';
 
 export const Dashboard: React.FC = () => {
-  const { db } = useAppContext();
+  const { db: appData } = useAppContext();
   const { user } = useAuth();
 
-  if (!db || !user) return null;
+  if (!appData || !user) return null;
 
-  const userTasks = db.tasks.filter(t => t.assignedTo.includes(user.id));
+  const userTasks = appData.tasks.filter(t => t.assignedTo.includes(user.id));
   const completedTasks = userTasks.filter(t => t.status === 'completed').length;
   const pendingTasks = userTasks.filter(t => t.status === 'in_progress' || t.status === 'new').length;
   const delayedTasks = userTasks.filter(t => t.status === 'delayed').length;
-  const unreadAnnouncements = db.announcements.filter(a => !a.readBy.includes(user.id) && !a.isArchived).length;
+  const unreadAnnouncements = appData.announcements.filter(a => !a.readBy.includes(user.id) && !a.isArchived).length;
 
   const stats = [
     { label: 'إجمالي مهامي', value: userTasks.length, icon: FileText, color: 'primary' },
@@ -35,7 +35,9 @@ export const Dashboard: React.FC = () => {
     { label: 'مهام متأخرة', value: delayedTasks, icon: AlertCircle, color: 'red' },
   ];
 
-  const isAdmin = user.permissions.includes('full_control') || user.permissions.includes('view_performance');
+  const isAdmin = user.permissions.includes('full_control') || 
+                  user.permissions.includes('view_performance') ||
+                  user.email === 'Primegroup0123@gmail.com';
 
   return (
     <div className="space-y-8">
@@ -147,9 +149,9 @@ export const Dashboard: React.FC = () => {
               <TrendingUp className="w-5 h-5 text-emerald-400" />
             </h3>
             <div className="space-y-6">
-              {db.users.slice(0, 4).map(u => {
-                const completed = db.tasks.filter(t => t.assignedTo.includes(u.id) && t.status === 'completed').length;
-                const total = db.tasks.filter(t => t.assignedTo.includes(u.id)).length;
+              {appData.users.slice(0, 4).map(u => {
+                const completed = appData.tasks.filter(t => t.assignedTo.includes(u.id) && t.status === 'completed').length;
+                const total = appData.tasks.filter(t => t.assignedTo.includes(u.id)).length;
                 const percent = total > 0 ? Math.round((completed / total) * 100) : 0;
                 
                 return (

@@ -27,20 +27,20 @@ import {
 } from 'recharts';
 
 export const ReportsPage: React.FC = () => {
-  const { db } = useAppContext();
+  const { db: appData } = useAppContext();
   const [timeRange, setTimeRange] = useState('month');
 
-  if (!db) return null;
+  if (!appData) return null;
 
   // Task Statistics
-  const totalTasks = db.tasks.length;
-  const completedTasks = db.tasks.filter(t => t.status === 'completed').length;
-  const inProgressTasks = db.tasks.filter(t => t.status === 'in_progress' || t.status === 'new').length;
-  const pendingTasks = db.tasks.filter(t => t.status === 'pending').length;
-  const overdueTasks = db.tasks.filter(t => t.status !== 'completed' && t.status !== 'cancelled' && new Date(t.deadline) < new Date()).length;
+  const totalTasks = appData.tasks.length;
+  const completedTasks = appData.tasks.filter(t => t.status === 'completed').length;
+  const inProgressTasks = appData.tasks.filter(t => t.status === 'in_progress' || t.status === 'new').length;
+  const pendingTasks = appData.tasks.filter(t => t.status === 'pending').length;
+  const overdueTasks = appData.tasks.filter(t => t.status !== 'completed' && t.status !== 'cancelled' && new Date(t.deadline) < new Date()).length;
 
-  const totalEstimatedHours = db.tasks.reduce((acc, t) => acc + (t.estimatedHours || 0), 0);
-  const totalActualHours = db.tasks.reduce((acc, t) => acc + (t.actualHours || 0), 0);
+  const totalEstimatedHours = appData.tasks.reduce((acc, t) => acc + (t.estimatedHours || 0), 0);
+  const totalActualHours = appData.tasks.reduce((acc, t) => acc + (t.actualHours || 0), 0);
 
   const completionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
@@ -49,7 +49,7 @@ export const ReportsPage: React.FC = () => {
     const date = new Date();
     date.setDate(date.getDate() - (29 - i));
     const dateStr = date.toISOString().split('T')[0];
-    const count = db.tasks.filter(t => 
+    const count = appData.tasks.filter(t => 
       t.status === 'completed' && 
       t.reports.some(r => r.completedAt.startsWith(dateStr))
     ).length;
@@ -65,8 +65,8 @@ export const ReportsPage: React.FC = () => {
   ];
 
   // Data for Employee Performance
-  const employeePerformance = db.users.map(user => {
-    const userTasks = db.tasks.filter(t => t.assignedTo.includes(user.id));
+  const employeePerformance = appData.users.map(user => {
+    const userTasks = appData.tasks.filter(t => t.assignedTo.includes(user.id));
     const userCompleted = userTasks.filter(t => t.status === 'completed').length;
     return {
       name: user.name,
@@ -103,16 +103,15 @@ export const ReportsPage: React.FC = () => {
       {/* Stats Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         {[
-          { label: 'إجمالي المهام', value: totalTasks, icon: FileText, color: 'primary' },
-          { label: 'نسبة الإنجاز', value: `${completionRate}%`, icon: TrendingUp, color: 'emerald' },
-          { label: 'ساعات العمل الفعلية', value: `${totalActualHours} / ${totalEstimatedHours}`, icon: Clock, color: 'amber' },
-          { label: 'الموظفين النشطين', value: db.users.filter(u => u.status === 'active').length, icon: Users, color: 'purple' },
-        ].map((stat, idx) => (
+          { id: 'total-tasks', label: 'إجمالي المهام', value: totalTasks, icon: FileText, color: 'primary' },
+          { id: 'completion-rate', label: 'نسبة الإنجاز', value: `${completionRate}%`, icon: TrendingUp, color: 'emerald' },
+          { id: 'actual-hours', label: 'ساعات العمل الفعلية', value: `${totalActualHours} / ${totalEstimatedHours}`, icon: Clock, color: 'amber' },
+          { id: 'active-users', label: 'الموظفين النشطين', value: appData.users.filter(u => u.status === 'active').length, icon: Users, color: 'purple' },
+        ].map((stat) => (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: idx * 0.1 }}
-            key={idx}
+            key={stat.id}
             className="bg-zinc-900/50 border border-white/5 p-6 rounded-3xl"
           >
             <div className={`w-12 h-12 rounded-2xl ${stat.color === 'primary' ? 'bg-primary-light' : `bg-${stat.color}-500/10`} flex items-center justify-center mb-4`}>
@@ -140,13 +139,13 @@ export const ReportsPage: React.FC = () => {
           </div>
         </div>
         <div className="flex flex-wrap gap-2 justify-center">
-          {heatmapData.map((day, idx) => {
+          {heatmapData.map((day) => {
             const intensity = day.count === 0 ? 'bg-zinc-800' : 
                              day.count < 3 ? 'bg-primary/30' :
                              day.count < 6 ? 'bg-primary/60' : 'bg-primary';
             return (
               <div 
-                key={idx}
+                key={day.date}
                 title={`${day.date}: ${day.count} مهام`}
                 className={`w-8 h-8 rounded-lg ${intensity} transition-all hover:scale-110 cursor-help flex items-center justify-center text-[10px] font-bold text-white/50`}
               >
@@ -172,8 +171,8 @@ export const ReportsPage: React.FC = () => {
                   itemStyle={{ color: '#fff' }}
                 />
                 <Bar dataKey="value" radius={[8, 8, 0, 0]}>
-                  {statusData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  {statusData.map((entry) => (
+                    <Cell key={entry.name} fill={entry.color} />
                   ))}
                 </Bar>
               </BarChart>
@@ -185,8 +184,8 @@ export const ReportsPage: React.FC = () => {
         <div className="bg-zinc-900/50 border border-white/5 p-8 rounded-3xl">
           <h3 className="text-xl font-bold mb-8">أكثر الموظفين إنجازاً</h3>
           <div className="space-y-6">
-            {employeePerformance.map((emp, idx) => (
-              <div key={idx} className="space-y-2">
+            {employeePerformance.map((emp) => (
+              <div key={emp.name} className="space-y-2">
                 <div className="flex justify-between items-center text-sm">
                   <span className="font-bold">{emp.name}</span>
                   <span className="text-zinc-500">{emp.completed} مهمة مكتملة</span>
@@ -222,15 +221,15 @@ export const ReportsPage: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
-              {db.roles.map((role, idx) => {
-                const roleUsers = db.users.filter(u => u.roleId === role.id).map(u => u.id);
-                const roleTasks = db.tasks.filter(t => t.assignedTo.some(id => roleUsers.includes(id)));
+              {appData.roles.map((role) => {
+                const roleUsers = appData.users.filter(u => u.roleId === role.id).map(u => u.id);
+                const roleTasks = appData.tasks.filter(t => t.assignedTo.some(id => roleUsers.includes(id)));
                 const roleCompleted = roleTasks.filter(t => t.status === 'completed').length;
                 const roleInProgress = roleTasks.filter(t => t.status === 'in_progress' || t.status === 'new').length;
                 const roleRate = roleTasks.length > 0 ? Math.round((roleCompleted / roleTasks.length) * 100) : 0;
 
                 return (
-                  <tr key={idx} className="hover:bg-white/5 transition-colors">
+                  <tr key={role.id} className="hover:bg-white/5 transition-colors">
                     <td className="px-8 py-4 font-bold">{role.name}</td>
                     <td className="px-8 py-4 text-zinc-400">{roleTasks.length}</td>
                     <td className="px-8 py-4 text-emerald-400">{roleCompleted}</td>

@@ -4,13 +4,15 @@ import { useAuth } from '../context/AuthContext';
 import { X, Megaphone, Paperclip, Plus, FileText } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Announcement } from '../types';
+import { db as firestore } from '../firebase';
+import { doc, setDoc } from 'firebase/firestore';
 
 interface CreateAnnouncementModalProps {
   onClose: () => void;
 }
 
 export const CreateAnnouncementModal: React.FC<CreateAnnouncementModalProps> = ({ onClose }) => {
-  const { db, updateDB, addAuditLog, uploadFile } = useAppContext();
+  const { db: appData, addAuditLog, uploadFile } = useAppContext();
   const { user } = useAuth();
   
   const [title, setTitle] = useState('');
@@ -19,7 +21,7 @@ export const CreateAnnouncementModal: React.FC<CreateAnnouncementModalProps> = (
   const [attachments, setAttachments] = useState<{ url: string; name: string }[]>([]);
   const [isUploading, setIsUploading] = useState(false);
 
-  if (!db || !user) return null;
+  if (!appData || !user) return null;
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -39,24 +41,28 @@ export const CreateAnnouncementModal: React.FC<CreateAnnouncementModalProps> = (
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    const newAnnouncement: Announcement = {
-      id: Math.random().toString(36).substr(2, 9),
-      title,
-      content,
-      type,
-      attachments,
-      createdBy: user.id,
-      createdAt: new Date().toISOString(),
-      readBy: [user.id],
-      acknowledgedBy: type === 'acknowledge' ? [user.id] : [],
-      isArchived: false
-    };
+    try {
+      const id = Math.random().toString(36).substr(2, 9);
+      const newAnnouncement: Announcement = {
+        id,
+        title,
+        content,
+        type,
+        attachments,
+        createdBy: user.id,
+        createdAt: new Date().toISOString(),
+        readBy: [user.id],
+        acknowledgedBy: type === 'acknowledge' ? [user.id] : [],
+        isArchived: false
+      };
 
-    const newDB = { ...db, announcements: [newAnnouncement, ...db.announcements] };
-    await updateDB(newDB);
-    addAuditLog(user.id, user.name, `نشر إعلاناً جديداً: ${title}`);
-    
-    onClose();
+      await setDoc(doc(firestore, 'announcements', id), newAnnouncement);
+      addAuditLog(user.id, user.name, `نشر إعلاناً جديداً: ${title}`);
+      
+      onClose();
+    } catch (error) {
+      console.error('Error creating announcement:', error);
+    }
   };
 
   return (
@@ -126,13 +132,13 @@ export const CreateAnnouncementModal: React.FC<CreateAnnouncementModalProps> = (
             <div className="space-y-2">
               <label className="text-xs font-bold text-zinc-500 mr-1">المرفقات</label>
               <div className="flex flex-wrap gap-2 mb-2">
-                {attachments.map((file, idx) => (
-                  <div key={idx} className="bg-zinc-800 px-3 py-2 rounded-xl text-xs flex items-center gap-2 border border-white/5">
+                {attachments.map((file) => (
+                  <div key={file.url} className="bg-zinc-800 px-3 py-2 rounded-xl text-xs flex items-center gap-2 border border-white/5">
                     <Paperclip className="w-3.5 h-3.5 text-zinc-500" />
                     <span>{file.name}</span>
                     <button 
                       type="button" 
-                      onClick={() => setAttachments(attachments.filter((_, i) => i !== idx))}
+                      onClick={() => setAttachments(attachments.filter((a) => a.url !== file.url))}
                       className="hover:text-red-400 transition-colors"
                     >
                       <X className="w-3.5 h-3.5" />

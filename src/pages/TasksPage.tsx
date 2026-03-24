@@ -25,7 +25,7 @@ import { CreateTaskModal } from '../components/CreateTaskModal';
 import { TaskReportModal } from '../components/TaskReportModal';
 
 export const TasksPage: React.FC = () => {
-  const { db, updateDB, addAuditLog, addNotification } = useAppContext();
+  const { db: appData, updateDB, addAuditLog, addNotification } = useAppContext();
   const { user } = useAuth();
   const [filter, setFilter] = useState<'all' | 'my' | 'completed' | 'pending'>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -33,9 +33,9 @@ export const TasksPage: React.FC = () => {
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
 
-  if (!db || !user) return null;
+  if (!appData || !user) return null;
 
-  const filteredTasks = db.tasks.filter(task => {
+  const filteredTasks = appData.tasks.filter(task => {
     const matchesSearch = task.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
                           task.description.toLowerCase().includes(searchQuery.toLowerCase());
     
@@ -175,7 +175,7 @@ export const TasksPage: React.FC = () => {
               <div className="flex items-center gap-4 mb-6">
                 <div className="flex -space-x-2 rtl:space-x-reverse">
                   {task.assignedTo.slice(0, 3).map(uid => {
-                    const assignee = db.users.find(u => u.id === uid);
+                    const assignee = appData.users.find(u => u.id === uid);
                     return (
                       <div key={uid} className="w-8 h-8 rounded-full border-2 border-zinc-900 bg-zinc-800 flex items-center justify-center overflow-hidden" title={assignee?.name}>
                         {assignee?.avatar ? <img src={assignee.avatar} alt="" /> : <UserIcon className="w-4 h-4 text-zinc-500" />}
@@ -261,8 +261,8 @@ export const TasksPage: React.FC = () => {
                         <p className="text-xs text-zinc-600">لا توجد مرفقات لهذه المهمة</p>
                       ) : (
                         <div className="flex flex-wrap gap-3">
-                          {selectedTask.attachments.map((file, idx) => (
-                            <div key={idx} className="bg-zinc-800 px-4 py-2.5 rounded-xl text-xs flex items-center gap-2 border border-white/5">
+                          {selectedTask.attachments.map((file) => (
+                            <div key={file.url} className="bg-zinc-800 px-4 py-2.5 rounded-xl text-xs flex items-center gap-2 border border-white/5">
                               <Paperclip className="w-3.5 h-3.5 text-zinc-500" />
                               <span>{file.name}</span>
                             </div>
@@ -292,7 +292,7 @@ export const TasksPage: React.FC = () => {
                       <h4 className="text-sm font-bold mb-3">المكلفون</h4>
                       <div className="space-y-2">
                         {selectedTask.assignedTo.map(uid => {
-                          const assignee = db.users.find(u => u.id === uid);
+                          const assignee = appData.users.find(u => u.id === uid);
                           const hasReport = selectedTask.reports.some(r => r.userId === uid);
                           return (
                             <div key={uid} className="flex items-center justify-between bg-zinc-800/50 px-3 py-2 rounded-xl">
@@ -321,8 +321,8 @@ export const TasksPage: React.FC = () => {
                     {selectedTask.reports.length === 0 ? (
                       <p className="text-center text-zinc-600 py-8">لا توجد تقارير إنجاز بعد</p>
                     ) : (
-                      selectedTask.reports.map((report, idx) => (
-                        <div key={idx} className="bg-zinc-800/30 border border-white/5 p-6 rounded-2xl">
+                      selectedTask.reports.map((report) => (
+                        <div key={report.userId} className="bg-zinc-800/30 border border-white/5 p-6 rounded-2xl">
                           <div className="flex items-center justify-between mb-4">
                             <div className="flex items-center gap-3">
                               <div className="w-8 h-8 rounded-lg bg-zinc-700 flex items-center justify-center">

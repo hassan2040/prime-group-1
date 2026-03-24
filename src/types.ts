@@ -16,6 +16,7 @@ export type Permission =
 export interface User {
   id: string;
   username: string;
+  email?: string;
   password?: string;
   name: string;
   roleId: string;
@@ -31,6 +32,7 @@ export interface Department {
   id: string;
   name: string;
   managerId?: string;
+  parentId?: string;
 }
 
 export interface Role {

@@ -1,9 +1,13 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { User, DB } from '../types';
+import { User } from '../types';
+import { auth, db } from '../firebase';
+import { onAuthStateChanged, signInWithEmailAndPassword, signOut, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 
 interface AuthContextType {
   user: User | null;
   login: (username: string, password: string) => Promise<boolean>;
+  loginWithGoogle: () => Promise<void>;
   logout: () => void;
   isLoading: boolean;
   updateUser: (user: User) => void;
@@ -16,67 +20,85 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const savedUser = localStorage.getItem('ems_user');
-    if (savedUser) {
-      setUser(JSON.parse(savedUser));
-    }
-    setIsLoading(false);
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        try {
+          const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+          if (userDoc.exists()) {
+            setUser(userDoc.data() as User);
+          } else if (firebaseUser.email === 'Primegroup0123@gmail.com') {
+            // Bootstrap admin user if it doesn't exist
+            const adminUser: User = {
+              id: firebaseUser.uid,
+              username: 'admin',
+              email: firebaseUser.email || undefined,
+              name: firebaseUser.displayName || 'المدير العام',
+              roleId: 'ceo',
+              departmentId: '',
+              permissions: ['full_control', 'view_performance', 'manage_employees', 'manage_announcements', 'manage_permissions', 'manage_settings', 'create_tasks'],
+              status: 'active',
+              joinedDate: new Date().toISOString().split('T')[0],
+              avatar: firebaseUser.photoURL || null
+            };
+            await setDoc(doc(db, 'users', firebaseUser.uid), adminUser);
+            setUser(adminUser);
+          } else {
+            // This might happen if auth exists but user doc doesn't (rare)
+            console.warn('User authenticated but Firestore document missing. Signing out.');
+            await signOut(auth);
+            setUser(null);
+          }
+        } catch (error) {
+          console.error('Error fetching user data:', error);
+          setUser(null);
+        }
+      } else {
+        setUser(null);
+      }
+      setIsLoading(false);
+    });
+
+    return () => unsubscribe();
   }, []);
 
   const login = async (username: string, password: string): Promise<boolean> => {
     setIsLoading(true);
     try {
-      const res = await fetch('/api/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password })
-      });
-      
-      const contentType = res.headers.get('content-type');
-      if (res.ok && contentType && contentType.includes('application/json')) {
-        const loggedInUser = await res.json();
-        setUser(loggedInUser);
-        localStorage.setItem('ems_user', JSON.stringify(loggedInUser));
-        setIsLoading(false);
-        return true;
-      } else {
-        // Handle non-JSON or error responses
-        let errorMessage = 'فشل تسجيل الدخول';
-        try {
-          if (contentType && contentType.includes('application/json')) {
-            const errorData = await res.json();
-            errorMessage = errorData.error || errorMessage;
-          } else {
-            const text = await res.text();
-            console.error('Non-JSON response from login:', text.substring(0, 100));
-            errorMessage = `خطأ في الخادم (${res.status})`;
-          }
-        } catch (e) {
-          console.error('Error parsing login error response:', e);
-        }
-        console.error('Login failed:', errorMessage);
-      }
+      const email = `${username.toLowerCase()}@ems.local`;
+      await signInWithEmailAndPassword(auth, email, password);
+      return true;
     } catch (error) {
-      console.error('Login network error:', error);
+      console.error('Login error:', error);
+      setIsLoading(false);
+      return false;
     }
-    setIsLoading(false);
-    return false;
   };
 
-  const logout = () => {
-    setUser(null);
-    localStorage.removeItem('ems_user');
+  const loginWithGoogle = async () => {
+    setIsLoading(true);
+    try {
+      const provider = new GoogleAuthProvider();
+      await signInWithPopup(auth, provider);
+    } catch (error) {
+      console.error('Google login error:', error);
+      setIsLoading(false);
+    }
+  };
+
+  const logout = async () => {
+    try {
+      await signOut(auth);
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
   };
 
   const updateUser = (updatedUser: User) => {
-    const userToSave = { ...updatedUser };
-    delete userToSave.password;
-    setUser(userToSave);
-    localStorage.setItem('ems_user', JSON.stringify(userToSave));
+    setUser(updatedUser);
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, isLoading, updateUser }}>
+    <AuthContext.Provider value={{ user, login, loginWithGoogle, logout, isLoading, updateUser }}>
       {children}
     </AuthContext.Provider>
   );

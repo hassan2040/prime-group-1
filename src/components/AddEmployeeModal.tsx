@@ -4,50 +4,80 @@ import { useAuth } from '../context/AuthContext';
 import { X, User as UserIcon, Shield, Briefcase, Mail, Lock } from 'lucide-react';
 import { motion } from 'motion/react';
 import { User } from '../types';
+import { db } from '../firebase';
+import { doc, setDoc } from 'firebase/firestore';
+import { initializeApp, getApp, getApps } from 'firebase/app';
+import { getAuth, createUserWithEmailAndPassword, signOut } from 'firebase/auth';
+import firebaseConfig from '../../firebase-applet-config.json';
 
 interface AddEmployeeModalProps {
   onClose: () => void;
 }
 
 export const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({ onClose }) => {
-  const { db, updateDB, addAuditLog, showToast } = useAppContext();
+  const { updateDB, addAuditLog, showToast } = useAppContext();
   const { user: currentUser } = useAuth();
+  const { db: appData } = useAppContext();
   
   const [name, setName] = useState('');
   const [username, setUsername] = useState('');
   const [roleId, setRoleId] = useState('');
   const [departmentId, setDepartmentId] = useState('');
   const [permissions, setPermissions] = useState<string[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  if (!db || !currentUser) return null;
+  if (!appData || !currentUser) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsSubmitting(true);
     
-    // Default password is '123456'
-    // The server will hash it on first login if we send it as plain text, 
-    // or we can hash it here if we had a hashing function available.
-    // Since server.ts handles plain text migration, we can send '123456'.
-    
-    const newUser: User = {
-      id: Math.random().toString(36).substr(2, 9),
-      username,
-      password: '123456',
-      name,
-      roleId,
-      departmentId,
-      permissions,
-      status: 'active',
-      joinedDate: new Date().toISOString().split('T')[0],
-      avatar: null
-    };
+    try {
+      // 1. Create Firebase Auth user using a secondary app instance
+      // This prevents the current admin from being logged out
+      let secondaryApp;
+      const apps = getApps();
+      const existingApp = apps.find(app => app.name === 'Secondary');
+      if (existingApp) {
+        secondaryApp = existingApp;
+      } else {
+        secondaryApp = initializeApp(firebaseConfig, 'Secondary');
+      }
+      
+      const secondaryAuth = getAuth(secondaryApp);
+      const email = `${username.toLowerCase()}@ems.local`;
+      const password = '123456';
+      
+      const userCredential = await createUserWithEmailAndPassword(secondaryAuth, email, password);
+      const newUserId = userCredential.user.uid;
+      
+      // Sign out from secondary app immediately
+      await signOut(secondaryAuth);
 
-    const newDB = { ...db, users: [...db.users, newUser] };
-    await updateDB(newDB);
-    addAuditLog(currentUser.id, currentUser.name, `أضاف موظفاً جديداً: ${name}`);
-    showToast(`تم إضافة الموظف ${name} بنجاح`);
-    
-    onClose();
+      // 2. Create User document in Firestore
+      const newUser: User = {
+        id: newUserId,
+        username,
+        name,
+        roleId,
+        departmentId,
+        permissions: permissions as any,
+        status: 'active',
+        joinedDate: new Date().toISOString().split('T')[0],
+        avatar: null
+      };
+
+      await setDoc(doc(db, 'users', newUserId), newUser);
+      
+      addAuditLog(currentUser.id, currentUser.name, `أضاف موظفاً جديداً: ${name}`);
+      showToast(`تم إضافة الموظف ${name} بنجاح`);
+      onClose();
+    } catch (error: any) {
+      console.error('Error adding employee:', error);
+      showToast(error.message || 'فشل في إضافة الموظف', 'error');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const togglePermission = (perm: string) => {
@@ -117,7 +147,7 @@ export const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({ onClose }) =
                   required
                 >
                   <option value="">اختر المسمى الوظيفي</option>
-                  {db.roles.map(role => (
+                  {appData.roles.map(role => (
                     <option key={role.id} value={role.id}>{role.name}</option>
                   ))}
                 </select>
@@ -131,9 +161,23 @@ export const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({ onClose }) =
                   className="w-full bg-zinc-800/50 border border-white/5 text-white px-5 py-3.5 rounded-2xl outline-none focus:ring-2 focus:ring-primary"
                 >
                   <option value="">اختر القسم (اختياري)</option>
-                  {db.departments.map(dept => (
-                    <option key={dept.id} value={dept.id}>{dept.name}</option>
-                  ))}
+                  {(() => {
+                    const renderOptions = (parentId: string | undefined = undefined, level: number = 0, visited = new Set<string>()): React.ReactNode[] => {
+                      const depts = appData.departments.filter(d => (d.parentId || undefined) === (parentId || undefined));
+                      return depts.flatMap(dept => {
+                        if (visited.has(dept.id)) return [];
+                        visited.add(dept.id);
+                        
+                        return [
+                          <option key={dept.id} value={dept.id}>
+                            {'\u00A0'.repeat(level * 4)}{level > 0 ? '↳ ' : ''}{dept.name}
+                          </option>,
+                          ...renderOptions(dept.id, level + 1, visited)
+                        ];
+                      });
+                    };
+                    return renderOptions();
+                  })()}
                 </select>
               </div>
 
@@ -182,10 +226,10 @@ export const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({ onClose }) =
             </button>
             <button 
               type="submit"
-              disabled={!name || !username || !roleId}
-              className="px-12 py-4 bg-primary hover:bg-primary-hover text-white font-bold rounded-2xl shadow-lg shadow-primary transition-all active:scale-95 disabled:opacity-50"
+              disabled={!name || !username || !roleId || isSubmitting}
+              className="px-12 py-4 bg-primary hover:bg-primary-hover text-white font-bold rounded-2xl shadow-lg shadow-primary transition-all active:scale-95 disabled:opacity-50 flex items-center gap-2"
             >
-              إضافة الموظف
+              {isSubmitting ? 'جاري الإضافة...' : 'إضافة الموظف'}
             </button>
           </div>
         </form>

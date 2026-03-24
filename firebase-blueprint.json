@@ -1,0 +1,165 @@
+{
+  "entities": {
+    "Company": {
+      "title": "Company Settings",
+      "description": "General settings for the company",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "logo": { "type": "string" },
+        "onboarded": { "type": "boolean" },
+        "loginTitle": { "type": "string" },
+        "loginSubtitle": { "type": "string" },
+        "loginBg": { "type": "string" },
+        "primaryColor": { "type": "string" },
+        "departments": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "name": { "type": "string" }
+            }
+          }
+        },
+        "roles": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "name": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "User": {
+      "title": "User Profile",
+      "description": "A user of the system",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "username": { "type": "string" },
+        "name": { "type": "string" },
+        "roleId": { "type": "string" },
+        "departmentId": { "type": "string" },
+        "permissions": { "type": "array", "items": { "type": "string" } },
+        "status": { "type": "string" },
+        "joinedDate": { "type": "string" },
+        "avatar": { "type": "string" },
+        "managerId": { "type": "string" }
+      }
+    },
+    "Task": {
+      "title": "Task",
+      "description": "A task assigned to users",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "assignedTo": { "type": "array", "items": { "type": "string" } },
+        "type": { "type": "string" },
+        "deadline": { "type": "string" },
+        "status": { "type": "string" },
+        "priority": { "type": "string" },
+        "createdBy": { "type": "string" },
+        "createdAt": { "type": "string" }
+      }
+    },
+    "Announcement": {
+      "title": "Announcement",
+      "description": "A company-wide announcement",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "content": { "type": "string" },
+        "authorId": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "priority": { "type": "string" }
+      }
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "A user notification",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "message": { "type": "string" },
+        "type": { "type": "string" },
+        "isRead": { "type": "boolean" },
+        "createdAt": { "type": "string" }
+      }
+    },
+    "AuditLog": {
+      "title": "Audit Log",
+      "description": "A log of system actions",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "action": { "type": "string" },
+        "timestamp": { "type": "string" }
+      }
+    },
+    "Role": {
+      "title": "Role",
+      "description": "A user role",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "permissions": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "Department": {
+      "title": "Department",
+      "description": "A company department",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "managerId": { "type": "string" }
+      }
+    }
+  },
+  "firestore": {
+    "/company/settings": {
+      "schema": "Company",
+      "description": "Global company settings"
+    },
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profile data"
+    },
+    "/tasks/{taskId}": {
+      "schema": "Task",
+      "description": "Tasks collection"
+    },
+    "/announcements/{announcementId}": {
+      "schema": "Announcement",
+      "description": "Announcements collection"
+    },
+    "/notifications/{notificationId}": {
+      "schema": "Notification",
+      "description": "Notifications collection"
+    },
+    "/auditLog/{logId}": {
+      "schema": "AuditLog",
+      "description": "Audit log collection"
+    },
+    "/roles/{roleId}": {
+      "schema": "Role",
+      "description": "Roles collection"
+    },
+    "/departments/{deptId}": {
+      "schema": "Department",
+      "description": "Departments collection"
+    }
+  }
+}

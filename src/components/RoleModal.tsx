@@ -4,6 +4,9 @@ import { motion } from 'motion/react';
 import { useAppContext } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import { Role } from '../types';
+import { db as firestore } from '../firebase';
+import { doc, setDoc, deleteDoc } from 'firebase/firestore';
+import { handleFirestoreError, OperationType } from '../lib/firestoreUtils';
 
 interface RoleModalProps {
   onClose: () => void;
@@ -11,36 +14,40 @@ interface RoleModalProps {
 }
 
 export const RoleModal: React.FC<RoleModalProps> = ({ onClose, role }) => {
-  const { db, updateDB, addAuditLog } = useAppContext();
+  const { db: appData, addAuditLog, showToast } = useAppContext();
   const { user } = useAuth();
   const [name, setName] = useState(role?.name || '');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!db || !user || !name.trim()) return;
+    if (!user || !name.trim()) return;
 
     setIsSubmitting(true);
+    const roleId = role?.id || Math.random().toString(36).substr(2, 9);
+    const path = `roles/${roleId}`;
+    
     try {
-      const newDB = { ...db };
+      const newRole: Role = {
+        id: roleId,
+        name: name.trim()
+      };
+      
+      await setDoc(doc(firestore, 'roles', roleId), newRole);
+      
       if (role) {
-        // Edit existing role
-        newDB.roles = newDB.roles.map(r => r.id === role.id ? { ...r, name: name.trim() } : r);
         addAuditLog(user.id, user.name, `تعديل المسمى الوظيفي: ${role.name} إلى ${name.trim()}`);
+        showToast('تم تحديث المسمى الوظيفي بنجاح');
       } else {
-        // Add new role
-        const newRole: Role = {
-          id: Math.random().toString(36).substr(2, 9),
-          name: name.trim()
-        };
-        newDB.roles = [...newDB.roles, newRole];
         addAuditLog(user.id, user.name, `إضافة مسمى وظيفي جديد: ${name.trim()}`);
+        showToast('تم إضافة المسمى الوظيفي بنجاح');
       }
 
-      await updateDB(newDB);
       onClose();
     } catch (error) {
       console.error('Error saving role:', error);
+      handleFirestoreError(error, OperationType.WRITE, path);
+      showToast('فشل حفظ المسمى الوظيفي', 'error');
     } finally {
       setIsSubmitting(false);
     }

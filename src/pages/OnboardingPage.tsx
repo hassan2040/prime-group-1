@@ -1,12 +1,16 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import { motion, AnimatePresence } from 'motion/react';
 import { Building, ShieldCheck, ArrowLeft, Upload, Image as ImageIcon, Lock, User as UserIcon } from 'lucide-react';
-import { User } from '../types';
+import { User, CompanySettings } from '../types';
+import { auth, db } from '../firebase';
+import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { doc, setDoc, getDocFromServer } from 'firebase/firestore';
+import { handleFirestoreError, OperationType } from '../lib/firestoreUtils';
 
 export const OnboardingPage: React.FC = () => {
-  const { db, updateDB, addAuditLog, uploadFile } = useAppContext();
+  const { updateDB, addAuditLog, uploadFile, showToast } = useAppContext();
   const { updateUser } = useAuth();
   const [companyName, setCompanyName] = useState('');
   const [logo, setLogo] = useState<string | null>(null);
@@ -15,9 +19,21 @@ export const OnboardingPage: React.FC = () => {
   const [adminPassword, setAdminPassword] = useState('');
   const [step, setStep] = useState(1);
   const [isUploading, setIsUploading] = useState(false);
+  const [isCompleting, setIsCompleting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  if (!db) return null;
+  useEffect(() => {
+    async function testConnection() {
+      try {
+        await getDocFromServer(doc(db, 'test', 'connection'));
+      } catch (error) {
+        if (error instanceof Error && error.message.includes('the client is offline')) {
+          console.error("Please check your Firebase configuration.");
+        }
+      }
+    }
+    testConnection();
+  }, []);
 
   const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -26,8 +42,10 @@ export const OnboardingPage: React.FC = () => {
         const file = e.target.files[0];
         const uploaded = await uploadFile(file);
         setLogo(uploaded.url);
+        showToast('تم رفع الشعار بنجاح');
       } catch (error) {
         console.error('Failed to upload logo:', error);
+        showToast('فشل رفع الشعار. تأكد من إعدادات Firebase Storage', 'error');
       } finally {
         setIsUploading(false);
       }
@@ -35,33 +53,63 @@ export const OnboardingPage: React.FC = () => {
   };
 
   const handleComplete = async () => {
-    const adminId = 'admin-' + Math.random().toString(36).substr(2, 9);
-    const newAdmin: User = {
-      id: adminId,
-      name: adminName,
-      username: adminUsername,
-      password: adminPassword, // Will be hashed by server on first login or if I implement hashing here
-      roleId: 'ceo',
-      permissions: ['full_control'],
-      status: 'active',
-      joinedDate: new Date().toISOString(),
-      avatar: null
-    };
+    setIsCompleting(true);
+    try {
+      // 1. Create Firebase Auth user
+      const email = `${adminUsername.toLowerCase()}@ems.local`;
+      const userCredential = await createUserWithEmailAndPassword(auth, email, adminPassword);
+      const adminId = userCredential.user.uid;
 
-    const newDB = {
-      ...db,
-      users: [newAdmin, ...db.users.filter(u => u.id !== 'admin-1')], // Replace default admin if exists
-      company: {
-        ...db.company,
+      // 2. Create User document in Firestore
+      const newAdmin: User = {
+        id: adminId,
+        name: adminName,
+        username: adminUsername,
+        roleId: 'ceo',
+        permissions: ['full_control'],
+        status: 'active',
+        joinedDate: new Date().toISOString(),
+        avatar: null
+      };
+
+      try {
+        await setDoc(doc(db, 'users', adminId), newAdmin);
+      } catch (error) {
+        handleFirestoreError(error, OperationType.WRITE, `users/${adminId}`);
+      }
+
+      // 3. Create Company Settings document
+      const companySettings: CompanySettings = {
         name: companyName || 'مؤسستي',
         logo: logo,
-        onboarded: true
-      }
-    };
+        onboarded: true,
+        primaryColor: '#2563eb'
+      };
 
-    await updateDB(newDB);
-    updateUser(newAdmin);
-    addAuditLog(newAdmin.id, newAdmin.name, 'أكمل إعدادات النظام الأولية وأنشأ حساب المدير');
+      try {
+        await setDoc(doc(db, 'company', 'settings'), companySettings);
+      } catch (error) {
+        handleFirestoreError(error, OperationType.WRITE, 'company/settings');
+      }
+
+      // 4. Update local state
+      updateUser(newAdmin);
+      addAuditLog(newAdmin.id, newAdmin.name, 'أكمل إعدادات النظام الأولية وأنشأ حساب المدير');
+      showToast('تم إعداد النظام بنجاح!');
+    } catch (error: any) {
+      console.error('Onboarding failed:', error);
+      let message = 'فشل إعداد النظام. يرجى المحاولة مرة أخرى.';
+      if (error.code === 'auth/unauthorized-domain') {
+        message = 'هذا النطاق غير مصرح به في Firebase. يرجى إضافة رابط الموقع في Authorized Domains.';
+      } else if (error.code === 'auth/email-already-in-use') {
+        message = 'اسم المستخدم هذا مستخدم بالفعل.';
+      } else if (error.message && error.message.includes('Missing or insufficient permissions')) {
+        message = 'خطأ في الصلاحيات: تأكد من نشر قواعد الحماية (Rules) في Firestore.';
+      }
+      showToast(message, 'error');
+    } finally {
+      setIsCompleting(false);
+    }
   };
 
   return (
@@ -260,9 +308,10 @@ export const OnboardingPage: React.FC = () => {
                   </button>
                   <button
                     onClick={handleComplete}
-                    className="flex-[2] bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-4 rounded-2xl shadow-lg shadow-emerald-900/20 transition-all active:scale-95"
+                    disabled={isCompleting}
+                    className="flex-[2] bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-4 rounded-2xl shadow-lg shadow-emerald-900/20 transition-all active:scale-95 disabled:opacity-50"
                   >
-                    بدء العمل الآن
+                    {isCompleting ? 'جاري التجهيز...' : 'بدء العمل الآن'}
                   </button>
                 </div>
               </motion.div>

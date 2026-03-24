@@ -4,6 +4,8 @@ import { useAuth } from '../context/AuthContext';
 import { X, User as UserIcon, Shield, Briefcase, Mail, Lock, Save } from 'lucide-react';
 import { motion } from 'motion/react';
 import { User } from '../types';
+import { db } from '../firebase';
+import { doc, updateDoc } from 'firebase/firestore';
 
 interface EditEmployeeModalProps {
   employee: User;
@@ -11,7 +13,7 @@ interface EditEmployeeModalProps {
 }
 
 export const EditEmployeeModal: React.FC<EditEmployeeModalProps> = ({ employee, onClose }) => {
-  const { db, updateDB, addAuditLog, showToast } = useAppContext();
+  const { db: appData, addAuditLog, showToast } = useAppContext();
   const { user: currentUser } = useAuth();
   
   const [name, setName] = useState(employee.name);
@@ -20,28 +22,33 @@ export const EditEmployeeModal: React.FC<EditEmployeeModalProps> = ({ employee, 
   const [departmentId, setDepartmentId] = useState(employee.departmentId || '');
   const [status, setStatus] = useState(employee.status);
   const [permissions, setPermissions] = useState<string[]>(employee.permissions);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  if (!db || !currentUser) return null;
+  if (!appData || !currentUser) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsSubmitting(true);
     
-    const newDB = { ...db };
-    const userIdx = newDB.users.findIndex(u => u.id === employee.id);
-    if (userIdx !== -1) {
-      newDB.users[userIdx] = {
-        ...newDB.users[userIdx],
+    try {
+      const userRef = doc(db, 'users', employee.id);
+      await updateDoc(userRef, {
         name,
         username,
         roleId,
         departmentId,
         status,
         permissions
-      };
-      await updateDB(newDB);
+      });
+      
       addAuditLog(currentUser.id, currentUser.name, `عدل بيانات الموظف: ${name}`);
       showToast(`تم تحديث بيانات الموظف ${name} بنجاح`);
       onClose();
+    } catch (error) {
+      console.error('Error updating user:', error);
+      showToast('فشل في تحديث بيانات الموظف', 'error');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -109,7 +116,7 @@ export const EditEmployeeModal: React.FC<EditEmployeeModalProps> = ({ employee, 
                   className="w-full bg-zinc-800/50 border border-white/5 text-white px-5 py-3.5 rounded-2xl outline-none focus:ring-2 focus:ring-primary"
                   required
                 >
-                  {db.roles.map(role => (
+                  {appData.roles.map(role => (
                     <option key={role.id} value={role.id}>{role.name}</option>
                   ))}
                 </select>
@@ -123,9 +130,23 @@ export const EditEmployeeModal: React.FC<EditEmployeeModalProps> = ({ employee, 
                   className="w-full bg-zinc-800/50 border border-white/5 text-white px-5 py-3.5 rounded-2xl outline-none focus:ring-2 focus:ring-primary"
                 >
                   <option value="">اختر القسم (اختياري)</option>
-                  {db.departments.map(dept => (
-                    <option key={dept.id} value={dept.id}>{dept.name}</option>
-                  ))}
+                  {(() => {
+                    const renderOptions = (parentId: string | undefined = undefined, level: number = 0, visited = new Set<string>()): React.ReactNode[] => {
+                      const depts = appData.departments.filter(d => (d.parentId || undefined) === (parentId || undefined));
+                      return depts.flatMap(dept => {
+                        if (visited.has(dept.id)) return [];
+                        visited.add(dept.id);
+                        
+                        return [
+                          <option key={dept.id} value={dept.id}>
+                            {'\u00A0'.repeat(level * 4)}{level > 0 ? '↳ ' : ''}{dept.name}
+                          </option>,
+                          ...renderOptions(dept.id, level + 1, visited)
+                        ];
+                      });
+                    };
+                    return renderOptions();
+                  })()}
                 </select>
               </div>
 
@@ -186,10 +207,10 @@ export const EditEmployeeModal: React.FC<EditEmployeeModalProps> = ({ employee, 
             </button>
             <button 
               type="submit"
-              disabled={!name || !username || !roleId}
-              className="px-12 py-4 bg-white text-zinc-900 font-bold rounded-2xl shadow-lg transition-all active:scale-95 disabled:opacity-50"
+              disabled={!name || !username || !roleId || isSubmitting}
+              className="px-12 py-4 bg-white text-zinc-900 font-bold rounded-2xl shadow-lg transition-all active:scale-95 disabled:opacity-50 flex items-center gap-2"
             >
-              حفظ التغييرات
+              {isSubmitting ? 'جاري الحفظ...' : 'حفظ التغييرات'}
             </button>
           </div>
         </form>

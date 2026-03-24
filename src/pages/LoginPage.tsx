@@ -9,7 +9,7 @@ export const LoginPage: React.FC = () => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { login } = useAuth();
+  const { login, loginWithGoogle } = useAuth();
   const { db } = useAppContext();
 
   const company = db?.company;
@@ -125,24 +125,44 @@ export const LoginPage: React.FC = () => {
               </motion.div>
             )}
 
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="w-full text-white font-bold py-4 rounded-2xl shadow-lg flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed"
-              style={{ 
-                backgroundColor: company?.primaryColor || '#2563eb',
-                boxShadow: `0 10px 15px -3px ${company?.primaryColor}33`
-              }}
-            >
-              {isSubmitting ? (
-                <div className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-              ) : (
-                <>
-                  <LogIn className="w-5 h-5" />
-                  <span>تسجيل الدخول</span>
-                </>
-              )}
-            </button>
+            <div className="space-y-3">
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="w-full text-white font-bold py-4 rounded-2xl shadow-lg flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed"
+                style={{ 
+                  backgroundColor: company?.primaryColor || '#2563eb',
+                  boxShadow: `0 10px 15px -3px ${company?.primaryColor}33`
+                }}
+              >
+                {isSubmitting ? (
+                  <div className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                ) : (
+                  <>
+                    <LogIn className="w-5 h-5" />
+                    <span>تسجيل الدخول</span>
+                  </>
+                )}
+              </button>
+
+              <div className="relative py-2">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-white/5"></div>
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-[#0a0a0a] px-2 text-zinc-500">أو</span>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={loginWithGoogle}
+                className="w-full bg-white text-zinc-900 font-bold py-4 rounded-2xl shadow-lg flex items-center justify-center gap-3 transition-all active:scale-[0.98] hover:bg-zinc-100"
+              >
+                <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="w-5 h-5" />
+                <span>تسجيل الدخول بواسطة Google</span>
+              </button>
+            </div>
           </form>
 
           <div className="mt-8 pt-6 border-t border-white/5 text-center">

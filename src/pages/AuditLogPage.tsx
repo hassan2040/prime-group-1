@@ -14,12 +14,12 @@ import {
 import { motion } from 'motion/react';
 
 export const AuditLogPage: React.FC = () => {
-  const { db } = useAppContext();
+  const { db: appData } = useAppContext();
   const [searchQuery, setSearchQuery] = useState('');
 
-  if (!db) return null;
+  if (!appData) return null;
 
-  const logs = [...db.auditLog]
+  const logs = [...appData.auditLog]
     .filter(log => 
       log.action.toLowerCase().includes(searchQuery.toLowerCase()) || 
       log.userName.toLowerCase().includes(searchQuery.toLowerCase())

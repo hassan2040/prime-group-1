@@ -3,10 +3,14 @@ import { useAuth } from '../context/AuthContext';
 import { useAppContext } from '../context/AppContext';
 import { User as UserIcon, Camera, Lock, Save, Shield } from 'lucide-react';
 import { motion } from 'motion/react';
+import { db as firestore } from '../firebase';
+import { doc, updateDoc } from 'firebase/firestore';
+import { updatePassword, EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
+import { auth } from '../firebase';
 
 export const ProfilePage: React.FC = () => {
   const { user, updateUser } = useAuth();
-  const { db, updateDB, addAuditLog, uploadFile } = useAppContext();
+  const { db: appData, addAuditLog, uploadFile } = useAppContext();
   
   const [name, setName] = useState(user?.name || '');
   const [currentPassword, setCurrentPassword] = useState('');
@@ -15,7 +19,7 @@ export const ProfilePage: React.FC = () => {
   const [isUploading, setIsUploading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
-  if (!user || !db) return null;
+  if (!user || !appData) return null;
 
   const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -24,15 +28,12 @@ export const ProfilePage: React.FC = () => {
         const file = e.target.files[0];
         const uploaded = await uploadFile(file);
         
-        const newDB = { ...db };
-        const userIdx = newDB.users.findIndex(u => u.id === user.id);
-        if (userIdx !== -1) {
-          newDB.users[userIdx].avatar = uploaded.url;
-          await updateDB(newDB);
-          updateUser(newDB.users[userIdx]);
-          addAuditLog(user.id, user.name, 'قام بتغيير الصورة الشخصية');
-          setMessage({ type: 'success', text: 'تم تحديث الصورة الشخصية بنجاح' });
-        }
+        await updateDoc(doc(firestore, 'users', user.id), {
+          avatar: uploaded.url
+        });
+        
+        addAuditLog(user.id, user.name, 'قام بتغيير الصورة الشخصية');
+        setMessage({ type: 'success', text: 'تم تحديث الصورة الشخصية بنجاح' });
       } catch (error) {
         setMessage({ type: 'error', text: 'فشل رفع الصورة' });
       } finally {
@@ -43,14 +44,15 @@ export const ProfilePage: React.FC = () => {
 
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
-    const newDB = { ...db };
-    const userIdx = newDB.users.findIndex(u => u.id === user.id);
-    if (userIdx !== -1) {
-      newDB.users[userIdx].name = name;
-      await updateDB(newDB);
-      updateUser(newDB.users[userIdx]);
+    try {
+      await updateDoc(doc(firestore, 'users', user.id), {
+        name: name
+      });
       addAuditLog(user.id, user.name, 'قام بتحديث بيانات الملف الشخصي');
       setMessage({ type: 'success', text: 'تم تحديث البيانات بنجاح' });
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      setMessage({ type: 'error', text: 'فشل تحديث البيانات' });
     }
   };
 
@@ -61,30 +63,25 @@ export const ProfilePage: React.FC = () => {
       return;
     }
 
-    try {
-      // We need a backend endpoint for password change to verify current password
-      const res = await fetch('/api/change-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: user.id,
-          currentPassword,
-          newPassword
-        })
-      });
+    if (!auth.currentUser || !auth.currentUser.email) return;
 
-      const data = await res.json();
-      if (res.ok) {
-        setMessage({ type: 'success', text: 'تم تغيير كلمة المرور بنجاح' });
-        setCurrentPassword('');
-        setNewPassword('');
-        setConfirmPassword('');
-        addAuditLog(user.id, user.name, 'قام بتغيير كلمة المرور');
-      } else {
-        setMessage({ type: 'error', text: data.error || 'فشل تغيير كلمة المرور' });
+    try {
+      const credential = EmailAuthProvider.credential(auth.currentUser.email, currentPassword);
+      await reauthenticateWithCredential(auth.currentUser, credential);
+      await updatePassword(auth.currentUser, newPassword);
+      
+      setMessage({ type: 'success', text: 'تم تغيير كلمة المرور بنجاح' });
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      addAuditLog(user.id, user.name, 'قام بتغيير كلمة المرور');
+    } catch (error: any) {
+      console.error('Error changing password:', error);
+      let errorMsg = 'فشل تغيير كلمة المرور';
+      if (error.code === 'auth/wrong-password') {
+        errorMsg = 'كلمة المرور الحالية غير صحيحة';
       }
-    } catch (error) {
-      setMessage({ type: 'error', text: 'حدث خطأ أثناء الاتصال بالخادم' });
+      setMessage({ type: 'error', text: errorMsg });
     }
   };
 
@@ -131,7 +128,7 @@ export const ProfilePage: React.FC = () => {
             <div className="pt-6 border-t border-white/5">
               <div className="flex items-center justify-center gap-2 text-primary bg-primary-light py-2 rounded-xl text-xs font-bold">
                 <Shield className="w-4 h-4" />
-                <span>{db.roles.find(r => r.id === user.roleId)?.name}</span>
+                <span>{appData.roles.find(r => r.id === user.roleId)?.name}</span>
               </div>
             </div>
           </div>

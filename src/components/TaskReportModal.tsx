@@ -4,6 +4,8 @@ import { X, Upload, Paperclip, CheckCircle2, Clock, User as UserIcon } from 'luc
 import { motion } from 'motion/react';
 import { useAuth } from '../context/AuthContext';
 import { useAppContext } from '../context/AppContext';
+import { db as firestore } from '../firebase';
+import { doc, updateDoc, arrayUnion } from 'firebase/firestore';
 
 interface TaskReportModalProps {
   task: Task;
@@ -12,14 +14,14 @@ interface TaskReportModalProps {
 
 export const TaskReportModal: React.FC<TaskReportModalProps> = ({ task, onClose }) => {
   const { user } = useAuth();
-  const { db, updateDB, addAuditLog, addNotification, uploadFile } = useAppContext();
+  const { db: appData, addAuditLog, addNotification, uploadFile } = useAppContext();
   const [content, setContent] = useState('');
   const [actualHours, setActualHours] = useState<number>(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [attachments, setAttachments] = useState<{ url: string; name: string }[]>([]);
   const [isUploading, setIsUploading] = useState(false);
 
-  if (!user || !db) return null;
+  if (!user || !appData) return null;
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -40,67 +42,71 @@ export const TaskReportModal: React.FC<TaskReportModalProps> = ({ task, onClose 
     e.preventDefault();
     setIsSubmitting(true);
 
-    const newDB = { ...db };
-    const taskIdx = newDB.tasks.findIndex(t => t.id === task.id);
-    
-    if (taskIdx === -1) return;
+    try {
+      const report = {
+        userId: user.id,
+        userName: user.name,
+        content,
+        attachments,
+        completedAt: new Date().toISOString()
+      };
 
-    const report = {
-      userId: user.id,
-      userName: user.name,
-      content,
-      attachments,
-      completedAt: new Date().toISOString()
-    };
-
-    // Detect mentions in report
-    const mentionRegex = /@(\w+)/g;
-    const matches = content.match(mentionRegex);
-    if (matches) {
-      const mentionedUsernames = matches.map(m => m.substring(1));
-      const mentionedUsers = db.users.filter(u => mentionedUsernames.includes(u.username));
-      
-      mentionedUsers.forEach(u => {
-        addNotification({
-          userId: u.id,
-          title: 'إشارة إليك في تقرير',
-          message: `تمت الإشارة إليك في تقرير المهمة: ${task.title}`,
-          type: 'task_deadline',
-          link: '/tasks'
+      // Detect mentions in report
+      const mentionRegex = /@(\w+)/g;
+      const matches = content.match(mentionRegex);
+      if (matches) {
+        const mentionedUsernames = matches.map(m => m.substring(1));
+        const mentionedUsers = appData.users.filter(u => mentionedUsernames.includes(u.username));
+        
+        mentionedUsers.forEach(u => {
+          addNotification({
+            userId: u.id,
+            title: 'إشارة إليك في تقرير',
+            message: `تمت الإشارة إليك في تقرير المهمة: ${task.title}`,
+            type: 'task_deadline',
+            link: '/tasks'
+          });
         });
-      });
-    }
-
-    newDB.tasks[taskIdx].reports.push(report);
-    newDB.tasks[taskIdx].actualHours = (newDB.tasks[taskIdx].actualHours || 0) + actualHours;
-
-    // If individual task, mark as completed
-    if (task.type === 'individual') {
-      newDB.tasks[taskIdx].status = 'completed';
-    } else {
-      // If group task, check if everyone completed
-      const allCompleted = task.assignedTo.every(uid => 
-        newDB.tasks[taskIdx].reports.some(r => r.userId === uid)
-      );
-      if (allCompleted) {
-        newDB.tasks[taskIdx].status = 'completed';
       }
+
+      const taskRef = doc(firestore, 'tasks', task.id);
+      const updates: any = {
+        reports: arrayUnion(report),
+        actualHours: (task.actualHours || 0) + actualHours
+      };
+
+      // If individual task, mark as completed
+      if (task.type === 'individual') {
+        updates.status = 'completed';
+      } else {
+        // If group task, check if everyone completed
+        // We need to check the latest reports including the one we just added
+        const allCompleted = task.assignedTo.every(uid => 
+          uid === user.id || task.reports.some(r => r.userId === uid)
+        );
+        if (allCompleted) {
+          updates.status = 'completed';
+        }
+      }
+
+      await updateDoc(taskRef, updates);
+      addAuditLog(user.id, user.name, `أنجز المهمة: ${task.title}`);
+      
+      // Notify creator
+      addNotification({
+        userId: task.createdBy,
+        title: 'تم إنجاز مهمة',
+        message: `قام ${user.name} بإنجاز المهمة: ${task.title}`,
+        type: 'task_deadline',
+        link: '/tasks'
+      });
+
+      onClose();
+    } catch (error) {
+      console.error('Error submitting task report:', error);
+    } finally {
+      setIsSubmitting(false);
     }
-
-    await updateDB(newDB);
-    addAuditLog(user.id, user.name, `أنجز المهمة: ${task.title}`);
-    
-    // Notify creator
-    addNotification({
-      userId: task.createdBy,
-      title: 'تم إنجاز مهمة',
-      message: `قام ${user.name} بإنجاز المهمة: ${task.title}`,
-      type: 'task_deadline',
-      link: '/tasks'
-    });
-
-    setIsSubmitting(false);
-    onClose();
   };
 
   return (
@@ -148,13 +154,13 @@ export const TaskReportModal: React.FC<TaskReportModalProps> = ({ task, onClose 
           <div className="space-y-2">
             <label className="text-sm text-zinc-400 mr-1">إرفاق ملفات الإثبات</label>
             <div className="flex flex-wrap gap-2 mb-2">
-              {attachments.map((file, idx) => (
-                <div key={idx} className="bg-zinc-800 px-3 py-1.5 rounded-xl text-[10px] flex items-center gap-2 border border-white/5">
+              {attachments.map((file) => (
+                <div key={file.url} className="bg-zinc-800 px-3 py-1.5 rounded-xl text-[10px] flex items-center gap-2 border border-white/5">
                   <Paperclip className="w-3 h-3 text-zinc-500" />
                   <span>{file.name}</span>
                   <button 
                     type="button" 
-                    onClick={() => setAttachments(attachments.filter((_, i) => i !== idx))}
+                    onClick={() => setAttachments(attachments.filter((f) => f.url !== file.url))}
                     className="hover:text-red-400"
                   >
                     <X className="w-3 h-3" />
