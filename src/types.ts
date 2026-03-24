@@ -6,6 +6,7 @@ export type Permission =
   | 'create_announcements'
   | 'edit_announcements'
   | 'delete_announcements'
+  | 'manage_announcements'
   | 'manage_employees'
   | 'manage_permissions'
   | 'manage_settings'

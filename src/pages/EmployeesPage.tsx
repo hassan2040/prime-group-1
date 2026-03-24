@@ -37,6 +37,7 @@ export const EmployeesPage: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
   const [roleFilter, setRoleFilter] = useState<string>('all');
   const [deptFilter, setDeptFilter] = useState<string>('all');
+  const [managerFilter, setManagerFilter] = useState<string>('all');
   
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isDeptModalOpen, setIsDeptModalOpen] = useState(false);
@@ -55,8 +56,9 @@ export const EmployeesPage: React.FC = () => {
     const matchesStatus = statusFilter === 'all' || u.status === statusFilter;
     const matchesRole = roleFilter === 'all' || u.roleId === roleFilter;
     const matchesDept = deptFilter === 'all' || u.departmentId === deptFilter;
+    const matchesManager = managerFilter === 'all' || u.managerId === managerFilter;
     
-    return matchesSearch && matchesStatus && matchesRole && matchesDept;
+    return matchesSearch && matchesStatus && matchesRole && matchesDept && matchesManager;
   });
 
   const handleDeleteUser = async () => {
@@ -237,6 +239,16 @@ export const EmployeesPage: React.FC = () => {
               return renderOptions();
             })()}
           </select>
+          <select 
+            value={managerFilter}
+            onChange={(e) => setManagerFilter(e.target.value)}
+            className="bg-zinc-900/50 border border-white/5 text-zinc-400 px-4 py-3.5 rounded-2xl outline-none focus:ring-2 focus:ring-primary transition-all text-sm"
+          >
+            <option value="all">المدير: الكل</option>
+            {appData.users.filter(u => appData.users.some(emp => emp.managerId === u.id)).map(manager => (
+              <option key={manager.id} value={manager.id}>{manager.name}</option>
+            ))}
+          </select>
         </div>
       </div>
 
@@ -260,6 +272,11 @@ export const EmployeesPage: React.FC = () => {
                       <p className="text-primary text-xs font-bold">• {appData.departments.find(d => d.id === employee.departmentId)?.name}</p>
                     )}
                   </div>
+                  {employee.managerId && (
+                    <p className="text-zinc-500 text-[10px] mt-1">
+                      المدير: <span className="text-zinc-300">{appData.users.find(u => u.id === employee.managerId)?.name}</span>
+                    </p>
+                  )}
                 </div>
               </div>
               <div className={`px-2 py-1 rounded-lg text-[10px] font-bold uppercase ${

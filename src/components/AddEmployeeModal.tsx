@@ -23,6 +23,7 @@ export const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({ onClose }) =
   const [username, setUsername] = useState('');
   const [roleId, setRoleId] = useState('');
   const [departmentId, setDepartmentId] = useState('');
+  const [managerId, setManagerId] = useState('');
   const [permissions, setPermissions] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -61,6 +62,7 @@ export const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({ onClose }) =
         name,
         roleId,
         departmentId,
+        managerId: managerId || undefined,
         permissions: permissions as any,
         status: 'active',
         joinedDate: new Date().toISOString().split('T')[0],
@@ -178,6 +180,20 @@ export const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({ onClose }) =
                     };
                     return renderOptions();
                   })()}
+                </select>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm text-zinc-400 mr-1">المدير المباشر</label>
+                <select
+                  value={managerId}
+                  onChange={(e) => setManagerId(e.target.value)}
+                  className="w-full bg-zinc-800/50 border border-white/5 text-white px-5 py-3.5 rounded-2xl outline-none focus:ring-2 focus:ring-primary"
+                >
+                  <option value="">بدون مدير (اختياري)</option>
+                  {appData.users.map(u => (
+                    <option key={u.id} value={u.id}>{u.name}</option>
+                  ))}
                 </select>
               </div>
 
