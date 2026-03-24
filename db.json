@@ -1,0 +1,338 @@
+{
+  "company": {
+    "name": "Prime Group",
+    "logo": "/uploads/1774231007400-76806695-file.jpg",
+    "onboarded": false,
+    "loginTitle": "Prime Group For Engineering Industries",
+    "loginSubtitle": "BOMAN & Thermoflow",
+    "loginBg": "https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?auto=format&fit=crop&q=80&w=1920",
+    "primaryColor": "#00529b"
+  },
+  "users": [],
+  "roles": [
+    {
+      "id": "ceo",
+      "name": "المدير التنفيذي / مدير البرنامج"
+    },
+    {
+      "id": "chairman",
+      "name": "رئيس مجلس الإدارة"
+    },
+    {
+      "id": "legal",
+      "name": "مدير الشؤون القانونية"
+    },
+    {
+      "id": "admin_consumption",
+      "name": "المدير الإداري"
+    },
+    {
+      "id": "office_manager",
+      "name": "مدير مكتب الإدارة"
+    },
+    {
+      "id": "financial_controller",
+      "name": "المدير المالي"
+    },
+    {
+      "id": "accountant",
+      "name": "محاسب"
+    },
+    {
+      "id": "sales_general_manager",
+      "name": "مدير عام المبيعات"
+    },
+    {
+      "id": "internal_sales_manager",
+      "name": "مدير المبيعات الداخلية"
+    },
+    {
+      "id": "external_sales_manager",
+      "name": "مدير مبيعات خارجية"
+    },
+    {
+      "id": "fish_monto",
+      "name": "مندوب مبيعات خارجيه"
+    },
+    {
+      "id": "quant_manager",
+      "name": "Account Manager"
+    },
+    {
+      "id": "internal_sales_officer",
+      "name": "مسئول مبيعات داخلية"
+    },
+    {
+      "id": "maintenance_manager",
+      "name": "مدير التركيبات والصيانة"
+    },
+    {
+      "id": "customer_service_manager",
+      "name": "مدير خدمة العملاء"
+    },
+    {
+      "id": "customer_service_agent",
+      "name": "موظف خدمة عملاء"
+    },
+    {
+      "id": "promoter",
+      "name": "Promoter"
+    },
+    {
+      "id": "return_officer",
+      "name": "مدير  مصنع"
+    },
+    {
+      "id": "warehouse_manager",
+      "name": "مسئول مخزن"
+    },
+    {
+      "id": "odiergxaq",
+      "name": "مندوب توصيل"
+    }
+  ],
+  "departments": [],
+  "tasks": [],
+  "announcements": [],
+  "notifications": [],
+  "auditLog": [
+    {
+      "id": "qag28x79g",
+      "userId": "admin-1",
+      "userName": "المدير التنفيذي / مدير البرنامج",
+      "action": "أعاد تعيين كلمة مرور الموظف: المدير التنفيذي / مدير البرنامج",
+      "timestamp": "2026-03-23T03:36:31.255Z"
+    },
+    {
+      "id": "dekszv40t",
+      "userId": "admin-1",
+      "userName": "المدير التنفيذي / مدير البرنامج",
+      "action": "تعديل إعدادات الشركة وتخصيص صفحة الدخول",
+      "timestamp": "2026-03-23T01:56:57.270Z"
+    },
+    {
+      "id": "kzdi76tkn",
+      "userId": "admin-1",
+      "userName": "المدير التنفيذي / مدير البرنامج",
+      "action": "تغيير شعار الشركة",
+      "timestamp": "2026-03-23T01:56:47.753Z"
+    },
+    {
+      "id": "us6m46xca",
+      "userId": "admin-1",
+      "userName": "المدير التنفيذي / مدير البرنامج",
+      "action": "تغيير شعار الشركة",
+      "timestamp": "2026-03-23T01:56:39.140Z"
+    },
+    {
+      "id": "28hrua7z0",
+      "userId": "admin-1",
+      "userName": "المدير التنفيذي / مدير البرنامج",
+      "action": "تعديل صلاحيات الموظف: المدير التنفيذي / مدير البرنامج",
+      "timestamp": "2026-03-23T01:20:42.792Z"
+    },
+    {
+      "id": "02enh50wt",
+      "userId": "admin-1",
+      "userName": "المدير التنفيذي / مدير البرنامج",
+      "action": "تعديل صلاحيات الموظف: المدير التنفيذي / مدير البرنامج",
+      "timestamp": "2026-03-23T01:20:41.849Z"
+    },
+    {
+      "id": "n2ewprv4b",
+      "userId": "admin-1",
+      "userName": "المدير التنفيذي / مدير البرنامج",
+      "action": "تعديل صلاحيات الموظف: المدير التنفيذي / مدير البرنامج",
+      "timestamp": "2026-03-23T01:20:40.834Z"
+    },
+    {
+      "id": "nx5n419s8",
+      "userId": "admin-1",
+      "userName": "المدير التنفيذي / مدير البرنامج",
+      "action": "تعديل صلاحيات الموظف: المدير التنفيذي / مدير البرنامج",
+      "timestamp": "2026-03-23T01:20:39.269Z"
+    },
+    {
+      "id": "sg6mk2942",
+      "userId": "admin-1",
+      "userName": "المدير التنفيذي / مدير البرنامج",
+      "action": "تعديل صلاحيات الموظف: المدير التنفيذي / مدير البرنامج",
+      "timestamp": "2026-03-23T01:20:38.386Z"
+    },
+    {
+      "id": "ztufzyqml",
+      "userId": "admin-1",
+      "userName": "المدير التنفيذي / مدير البرنامج",
+      "action": "تعديل صلاحيات الموظف: المدير التنفيذي / مدير البرنامج",
+      "timestamp": "2026-03-23T01:20:37.376Z"
+    },
+    {
+      "id": "72j4478bz",
+      "userId": "admin-1",
+      "userName": "المدير التنفيذي / مدير البرنامج",
+      "action": "تعديل صلاحيات الموظف: المدير التنفيذي / مدير البرنامج",
+      "timestamp": "2026-03-23T01:20:36.518Z"
+    },
+    {
+      "id": "3p4q2504s",
+      "userId": "admin-1",
+      "userName": "المدير التنفيذي / مدير البرنامج",
+      "action": "تعديل صلاحيات الموظف: المدير التنفيذي / مدير البرنامج",
+      "timestamp": "2026-03-23T01:20:35.669Z"
+    },
+    {
+      "id": "e4i2uxqpc",
+      "userId": "admin-1",
+      "userName": "المدير التنفيذي / مدير البرنامج",
+      "action": "تعديل صلاحيات الموظف: المدير التنفيذي / مدير البرنامج",
+      "timestamp": "2026-03-23T01:20:34.867Z"
+    },
+    {
+      "id": "x181dea47",
+      "userId": "admin-1",
+      "userName": "المدير التنفيذي / مدير البرنامج",
+      "action": "تعديل صلاحيات الموظف: المدير التنفيذي / مدير البرنامج",
+      "timestamp": "2026-03-23T01:20:33.683Z"
+    },
+    {
+      "id": "eym2mt4rt",
+      "userId": "admin-1",
+      "userName": "المدير التنفيذي / مدير البرنامج",
+      "action": "تعديل صلاحيات الموظف: المدير التنفيذي / مدير البرنامج",
+      "timestamp": "2026-03-23T01:20:32.659Z"
+    },
+    {
+      "id": "h0da0ls1l",
+      "userId": "admin-1",
+      "userName": "المدير التنفيذي / مدير البرنامج",
+      "action": "تعديل صلاحيات الموظف: المدير التنفيذي / مدير البرنامج",
+      "timestamp": "2026-03-23T01:20:32.241Z"
+    },
+    {
+      "id": "6l5m7o9he",
+      "userId": "admin-1",
+      "userName": "المدير التنفيذي / مدير البرنامج",
+      "action": "تعديل إعدادات الشركة وتخصيص صفحة الدخول",
+      "timestamp": "2026-03-23T01:17:21.183Z"
+    },
+    {
+      "id": "u84k6x16y",
+      "userId": "admin-1",
+      "userName": "المدير التنفيذي / مدير البرنامج",
+      "action": "تغيير شعار الشركة",
+      "timestamp": "2026-03-23T01:17:19.261Z"
+    },
+    {
+      "id": "2zf6f53wq",
+      "userId": "admin-1",
+      "userName": "المدير التنفيذي / مدير البرنامج",
+      "action": "تعديل إعدادات الشركة وتخصيص صفحة الدخول",
+      "timestamp": "2026-03-23T01:15:36.231Z"
+    },
+    {
+      "id": "1o4ky3ymp",
+      "userId": "admin-1",
+      "userName": "المدير التنفيذي / مدير البرنامج",
+      "action": "تغيير شعار الشركة",
+      "timestamp": "2026-03-23T01:15:33.299Z"
+    },
+    {
+      "id": "3jcbqp3bb",
+      "userId": "admin-1",
+      "userName": "المدير التنفيذي / مدير البرنامج",
+      "action": "تعديل إعدادات الشركة وتخصيص صفحة الدخول",
+      "timestamp": "2026-03-23T01:14:46.833Z"
+    },
+    {
+      "id": "ycdb6fpfl",
+      "userId": "admin-1",
+      "userName": "المدير التنفيذي / مدير البرنامج",
+      "action": "تغيير شعار الشركة",
+      "timestamp": "2026-03-23T01:14:44.153Z"
+    },
+    {
+      "id": "wqsfht8x4",
+      "userId": "admin-1",
+      "userName": "المدير التنفيذي / مدير البرنامج",
+      "action": "تغيير شعار الشركة",
+      "timestamp": "2026-03-23T01:05:29.245Z"
+    },
+    {
+      "id": "t7arfathc",
+      "userId": "admin-1",
+      "userName": "المدير التنفيذي / مدير البرنامج",
+      "action": "تغيير شعار الشركة",
+      "timestamp": "2026-03-23T01:04:21.806Z"
+    },
+    {
+      "id": "w8zzglrcw",
+      "userId": "admin-1",
+      "userName": "المدير التنفيذي / مدير البرنامج",
+      "action": "تعديل إعدادات الشركة وتخصيص صفحة الدخول",
+      "timestamp": "2026-03-23T00:58:53.090Z"
+    },
+    {
+      "id": "z7d5lfzlg",
+      "userId": "admin-1",
+      "userName": "المدير التنفيذي / مدير البرنامج",
+      "action": "تغيير شعار الشركة",
+      "timestamp": "2026-03-23T00:58:48.009Z"
+    },
+    {
+      "id": "27mrxj2l7",
+      "userId": "admin-1",
+      "userName": "المدير التنفيذي / مدير البرنامج",
+      "action": "تغيير شعار الشركة",
+      "timestamp": "2026-03-23T00:58:37.437Z"
+    },
+    {
+      "id": "3uciswqpw",
+      "userId": "admin-1",
+      "userName": "المدير التنفيذي / مدير البرنامج",
+      "action": "تعديل إعدادات الشركة وتخصيص صفحة الدخول",
+      "timestamp": "2026-03-23T00:58:05.208Z"
+    },
+    {
+      "id": "qkr0v5h5x",
+      "userId": "admin-1",
+      "userName": "المدير التنفيذي / مدير البرنامج",
+      "action": "تعديل إعدادات الشركة وتخصيص صفحة الدخول",
+      "timestamp": "2026-03-23T00:57:27.732Z"
+    },
+    {
+      "id": "nh2dqhek7",
+      "userId": "admin-1",
+      "userName": "المدير التنفيذي / مدير البرنامج",
+      "action": "تغيير شعار الشركة",
+      "timestamp": "2026-03-23T00:57:23.190Z"
+    },
+    {
+      "id": "b8u6hlv1y",
+      "userId": "admin-1",
+      "userName": "المدير التنفيذي / مدير البرنامج",
+      "action": "تعديل إعدادات الشركة",
+      "timestamp": "2026-03-23T00:46:26.316Z"
+    },
+    {
+      "id": "fvj87tf73",
+      "userId": "admin-1",
+      "userName": "المدير التنفيذي",
+      "action": "تغيير شعار الشركة",
+      "timestamp": "2026-03-23T00:45:55.114Z"
+    },
+    {
+      "id": "jf09lloqn",
+      "userId": "admin-1",
+      "userName": "المدير التنفيذي / مدير البرنامج",
+      "action": "أكمل إعدادات النظام الأولية",
+      "timestamp": "2026-03-22T22:07:09.798Z"
+    },
+    {
+      "id": "3s21snd7o",
+      "userId": "admin-1",
+      "userName": "المدير التنفيذي / مدير البرنامج",
+      "action": "أكمل إعدادات النظام الأولية",
+      "timestamp": "2026-03-22T22:02:37.197Z"
+    }
+  ]
+}
